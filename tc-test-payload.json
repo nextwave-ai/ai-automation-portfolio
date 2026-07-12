@@ -1,0 +1,37 @@
+{
+  "_readme": "Send each example below as a separate POST request to your webhook URL to test different classification outputs.",
+  "_usage": "curl -X POST https://YOUR-N8N-INSTANCE/webhook/customer-support -H 'Content-Type: application/json' -d '<payload>'",
+
+  "examples": [
+    {
+      "_label": "Test 1 — Order not arrived (expect: general/high/negative/needs_human: true)",
+      "name": "Ali",
+      "email": "ali@test.com",
+      "message": "My order has not arrived. It has been 10 days since I placed it and I still have no tracking update. I need this resolved immediately."
+    },
+    {
+      "_label": "Test 2 — Billing question (expect: billing/medium/neutral/needs_human: true)",
+      "name": "Sophie Laurent",
+      "email": "sophie@brightagency.co",
+      "message": "I was charged twice for my subscription this month. My bank shows two payments of $79 on June 1st and June 8th. Can you refund the duplicate charge?"
+    },
+    {
+      "_label": "Test 3 — Technical issue (expect: technical/high/negative/needs_human: true)",
+      "name": "Marcus Webb",
+      "email": "marcus@techflow.io",
+      "message": "I cannot log into my account. When I click the login button the page just spins and nothing happens. I have tried Chrome and Firefox. This has been happening for two days."
+    },
+    {
+      "_label": "Test 4 — Onboarding question (expect: onboarding/low/neutral/needs_human: false)",
+      "name": "Priya Nair",
+      "email": "priya@designhive.in",
+      "message": "Hi, I just signed up yesterday and I am trying to figure out how to invite my team members to the workspace. Where do I find that setting?"
+    },
+    {
+      "_label": "Test 5 — Positive feedback (expect: general/low/positive/needs_human: false)",
+      "name": "David Chen",
+      "email": "david@quantumops.io",
+      "message": "Just wanted to say the new dashboard update is fantastic. The analytics section is exactly what I needed. Thank you for listening to feedback!"
+    }
+  ]
+}
