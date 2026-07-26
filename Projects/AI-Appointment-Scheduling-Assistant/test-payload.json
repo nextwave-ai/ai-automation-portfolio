@@ -1,0 +1,57 @@
+{
+  "_readme": "Five test payloads covering all urgency levels, meeting types, and edge cases. Send each as a POST to your webhook URL.",
+  "_usage": "curl -X POST https://YOUR-N8N-INSTANCE/webhook/appointment-request -H 'Content-Type: application/json' -d '<payload>'",
+
+  "examples": [
+    {
+      "_label": "Test 1 — Standard demo request (expect: routine, classification: demo, ~60 min, video)",
+      "client_name": "Sarah Johnson",
+      "client_email": "sarah@innovatetech.com",
+      "requested_date": "2025-07-15",
+      "requested_time": "10:00",
+      "appointment_type": "demo",
+      "reason": "We want to see a live demo of your enterprise automation platform before making a procurement decision.",
+      "preferred_channel": "video"
+    },
+    {
+      "_label": "Test 2 — Urgent support call, tomorrow (expect: urgent, priority_flag: true, ~45 min)",
+      "client_name": "Marcus Webb",
+      "client_email": "marcus@techflow.io",
+      "requested_date": "tomorrow",
+      "requested_time": "14:00",
+      "appointment_type": "support",
+      "reason": "Our production integration broke overnight and we are losing transactions. Need a specialist call as soon as possible.",
+      "preferred_channel": "video"
+    },
+    {
+      "_label": "Test 3 — Emergency escalation (expect: emergency, priority_flag: true, suggested morning slot)",
+      "client_name": "Elena Vasquez",
+      "client_email": "elena@globalops.co",
+      "requested_date": "today",
+      "requested_time": "immediately",
+      "appointment_type": "support",
+      "reason": "CRITICAL: Our entire workflow automation suite is down and we have a board presentation in 3 hours. Need emergency assistance NOW.",
+      "preferred_channel": "phone"
+    },
+    {
+      "_label": "Test 4 — Onboarding session, out of hours (expect: routine, is_business_hours: false, slot suggestion)",
+      "client_name": "Priya Nair",
+      "client_email": "priya@designhive.in",
+      "requested_date": "2025-07-20",
+      "requested_time": "19:30",
+      "appointment_type": "onboarding",
+      "reason": "Just signed up for the Pro plan and would love a walkthrough of the main features and best practices for our use case.",
+      "preferred_channel": "video"
+    },
+    {
+      "_label": "Test 5 — Minimal data, vague date (expect: graceful fallback, validated_date: null or parsed, routine)",
+      "client_name": "Alex",
+      "client_email": "alex@startup.com",
+      "requested_date": "sometime next week",
+      "requested_time": "morning",
+      "appointment_type": "",
+      "reason": "Would like to chat about your services.",
+      "preferred_channel": ""
+    }
+  ]
+}

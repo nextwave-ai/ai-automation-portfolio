@@ -1,0 +1,287 @@
+{
+  "name": "AI Appointment Scheduling Assistant",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "appointment-request",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "appt-node-001",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 360],
+      "webhookId": "appointment-assistant-webhook-v1"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "appt-field-001",
+              "name": "client_name",
+              "value": "={{ $json.body.client_name || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-002",
+              "name": "client_email",
+              "value": "={{ $json.body.client_email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-003",
+              "name": "requested_date",
+              "value": "={{ $json.body.requested_date || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-004",
+              "name": "requested_time",
+              "value": "={{ $json.body.requested_time || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-005",
+              "name": "appointment_type",
+              "value": "={{ $json.body.appointment_type || 'general' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-006",
+              "name": "reason",
+              "value": "={{ $json.body.reason || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-007",
+              "name": "preferred_channel",
+              "value": "={{ $json.body.preferred_channel || 'video' }}",
+              "type": "string"
+            },
+            {
+              "id": "appt-field-008",
+              "name": "received_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "appt-node-002",
+      "name": "Normalize Input",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [460, 360]
+    },
+    {
+      "parameters": {
+        "resource": "text",
+        "operation": "message",
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are an intelligent appointment scheduling assistant. Analyze the incoming appointment request and return ONLY a valid JSON object. No markdown. No explanation. No extra text.\n\nToday's context: appointments are scheduled during business hours (Monday–Friday, 09:00–17:00). Same-day or next-day requests are considered urgent.\n\nReturn exactly this JSON structure:\n{\n  \"urgency\": \"one of: routine | urgent | emergency\",\n  \"validated_date\": \"the requested date in YYYY-MM-DD format, or null if unparseable\",\n  \"validated_time\": \"the requested time in HH:MM 24h format, or null if unparseable\",\n  \"is_business_hours\": true or false,\n  \"suggested_slot\": \"a concrete alternative datetime string if the request is outside business hours or unclear, otherwise repeat the requested slot\",\n  \"appointment_duration_minutes\": integer — estimated meeting duration based on appointment type and reason,\n  \"classification\": \"one of: consultation | follow_up | demo | support | onboarding | general\",\n  \"channel_recommendation\": \"one of: video | phone | in_person\",\n  \"preparation_notes\": \"1-2 sentences the host should read before the meeting\",\n  \"client_confirmation_message\": \"a warm, professional 2-3 sentence message to send to the client confirming the booking intent\"\n}\n\nUrgency rules:\n- emergency: reason contains words like urgent, critical, emergency, ASAP, immediately\n- urgent: requested_date is today or tomorrow\n- routine: everything else"
+            },
+            {
+              "role": "user",
+              "content": "Process this appointment request:\n\nClient Name: {{ $json.client_name }}\nClient Email: {{ $json.client_email }}\nRequested Date: {{ $json.requested_date }}\nRequested Time: {{ $json.requested_time }}\nAppointment Type: {{ $json.appointment_type }}\nReason: {{ $json.reason }}\nPreferred Channel: {{ $json.preferred_channel }}\nRequest Received: {{ $json.received_at }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "options": {
+          "temperature": 0.2,
+          "maxTokens": 600
+        }
+      },
+      "id": "appt-node-003",
+      "name": "Analyze Request with OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [680, 360]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\n// Step 1: Extract raw text from OpenAI response\nlet rawText = '';\ntry {\n  rawText = item.json.choices[0].message.content;\n} catch (e) {\n  rawText = '';\n}\n\n// Step 2: Strip markdown fences and parse JSON\nlet parsed;\ntry {\n  const cleaned = rawText\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {};\n}\n\n// Step 3: Allowed value sets\nconst validUrgency = ['routine', 'urgent', 'emergency'];\nconst validClassification = ['consultation', 'follow_up', 'demo', 'support', 'onboarding', 'general'];\nconst validChannel = ['video', 'phone', 'in_person'];\n\n// Step 4: Validate and apply safe defaults for every field\nconst result = {\n  urgency: validUrgency.includes(parsed.urgency)\n    ? parsed.urgency\n    : 'routine',\n\n  validated_date: (typeof parsed.validated_date === 'string' && /^\\d{4}-\\d{2}-\\d{2}$/.test(parsed.validated_date))\n    ? parsed.validated_date\n    : null,\n\n  validated_time: (typeof parsed.validated_time === 'string' && /^\\d{2}:\\d{2}$/.test(parsed.validated_time))\n    ? parsed.validated_time\n    : null,\n\n  is_business_hours: typeof parsed.is_business_hours === 'boolean'\n    ? parsed.is_business_hours\n    : true,\n\n  suggested_slot: (typeof parsed.suggested_slot === 'string' && parsed.suggested_slot.length > 0)\n    ? parsed.suggested_slot\n    : 'Next available weekday at 10:00',\n\n  appointment_duration_minutes: (Number.isInteger(parsed.appointment_duration_minutes) && parsed.appointment_duration_minutes > 0)\n    ? parsed.appointment_duration_minutes\n    : 30,\n\n  classification: validClassification.includes(parsed.classification)\n    ? parsed.classification\n    : 'general',\n\n  channel_recommendation: validChannel.includes(parsed.channel_recommendation)\n    ? parsed.channel_recommendation\n    : 'video',\n\n  preparation_notes: (typeof parsed.preparation_notes === 'string' && parsed.preparation_notes.length > 0)\n    ? parsed.preparation_notes\n    : 'Review client history before the meeting.',\n\n  client_confirmation_message: (typeof parsed.client_confirmation_message === 'string' && parsed.client_confirmation_message.length > 0)\n    ? parsed.client_confirmation_message\n    : 'Thank you for your request. We will confirm your appointment shortly.'\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "appt-node-004",
+      "name": "Validate & Structure Response",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [900, 360]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": false,
+            "leftValue": "",
+            "typeValidation": "strict"
+          },
+          "conditions": [
+            {
+              "id": "urgency-check",
+              "leftValue": "={{ $json.urgency }}",
+              "rightValue": "routine",
+              "operator": {
+                "type": "string",
+                "operation": "notEquals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "appt-node-005",
+      "name": "Urgent or Emergency?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1120, 360]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, priority_flag: true, appointment: { urgency: $json.urgency, classification: $json.classification, validated_date: $json.validated_date, validated_time: $json.validated_time, is_business_hours: $json.is_business_hours, suggested_slot: $json.suggested_slot, appointment_duration_minutes: $json.appointment_duration_minutes, channel_recommendation: $json.channel_recommendation, preparation_notes: $json.preparation_notes, client_confirmation_message: $json.client_confirmation_message } }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Appointment-Priority",
+                "value": "high"
+              }
+            ]
+          }
+        }
+      },
+      "id": "appt-node-006",
+      "name": "Respond — Priority Booking",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 220]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ success: true, priority_flag: false, appointment: { urgency: $json.urgency, classification: $json.classification, validated_date: $json.validated_date, validated_time: $json.validated_time, is_business_hours: $json.is_business_hours, suggested_slot: $json.suggested_slot, appointment_duration_minutes: $json.appointment_duration_minutes, channel_recommendation: $json.channel_recommendation, preparation_notes: $json.preparation_notes, client_confirmation_message: $json.client_confirmation_message } }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "name": "X-Appointment-Priority",
+                "value": "normal"
+              }
+            ]
+          }
+        }
+      },
+      "id": "appt-node-007",
+      "name": "Respond — Routine Booking",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 500]
+    }
+  ],
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Input": {
+      "main": [
+        [
+          {
+            "node": "Analyze Request with OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze Request with OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Validate & Structure Response",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate & Structure Response": {
+      "main": [
+        [
+          {
+            "node": "Urgent or Emergency?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Urgent or Emergency?": {
+      "main": [
+        [
+          {
+            "node": "Respond — Priority Booking",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond — Routine Booking",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveManualExecutions": true,
+    "callerPolicy": "workflowsFromSameOwner"
+  },
+  "staticData": null,
+  "meta": {
+    "templateCredsSetupCompleted": false
+  },
+  "pinData": {},
+  "versionId": "1.0.0",
+  "tags": [
+    { "name": "appointment-scheduling" },
+    { "name": "ai-automation" },
+    { "name": "openai" },
+    { "name": "calendar" }
+  ]
+}

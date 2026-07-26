@@ -1,0 +1,617 @@
+{
+  "name": "AI CRM Data Enrichment",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "crm-enrichment",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "e98e2e75-067f-444e-9f42-81961379d9c2",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        -944,
+        -16
+      ],
+      "webhookId": "9631356d-8d83-494a-8338-5627e5aa42b8",
+      "notes": "Entry point. Receives lead data from any CRM, form, or external system via HTTP POST."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "crm-field-001",
+              "name": "firstName",
+              "value": "={{ $json.body.firstName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-002",
+              "name": "lastName",
+              "value": "={{ $json.body.lastName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-003",
+              "name": "fullName",
+              "value": "={{ ($json.body.firstName || '') + ' ' + ($json.body.lastName || '') }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-004",
+              "name": "company",
+              "value": "={{ $json.body.company || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-005",
+              "name": "email",
+              "value": "={{ $json.body.email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-006",
+              "name": "website",
+              "value": "={{ $json.body.website || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-007",
+              "name": "country",
+              "value": "={{ $json.body.country || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-008",
+              "name": "jobTitle",
+              "value": "={{ $json.body.jobTitle || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crm-field-009",
+              "name": "received_at",
+              "value": "={{ $now.toISO() }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "eb5d0ff7-aab3-464c-b291-493665e0df9a",
+      "name": "Normalize Lead Fields",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        -736,
+        -16
+      ],
+      "notes": "Maps raw webhook body fields into clean, named variables. Auto-generates fullName and timestamps the request."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "crm-cond-001",
+              "leftValue": "={{ $json.email }}",
+              "rightValue": "",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "1b3f3306-a3af-40c1-8ceb-6ddbb6ffdb21",
+      "name": "Email Present?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -512,
+        -16
+      ],
+      "notes": "Guards against leads with no email address. TRUE branch (email missing) returns a 400 error. FALSE branch continues to enrichment."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'error', code: 400, message: 'Validation failed: email is required.', received_at: $json.received_at }) }}",
+        "options": {
+          "responseCode": 400,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "9868ccc4-9cab-41d4-9438-58c8aa8dbb81",
+      "name": "Return Validation Error",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        -288,
+        -176
+      ],
+      "notes": "Returns HTTP 400 with a structured error JSON when email is missing. Terminates this branch."
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4.1-mini",
+          "mode": "list",
+          "cachedResultName": "gpt-4.1-mini"
+        },
+        "messages": {
+          "values": [
+            {
+              "content": "You are a senior B2B sales intelligence analyst. Analyze the lead information provided and return ONLY a valid JSON object — no markdown, no explanation, no extra text.\n\nReturn exactly this structure:\n{\n  \"companySummary\": \"2-3 sentences describing what the company likely does, their market position, and typical business needs\",\n  \"industry\": \"the most accurate industry label (e.g. SaaS, Financial Services, Healthcare Technology, E-commerce, Manufacturing, Professional Services)\",\n  \"companySize\": \"one of: 1-10 | 11-50 | 51-200 | 201-1000 | 1000+\",\n  \"businessType\": \"one of: B2B | B2C | B2B2C | Marketplace | Enterprise | Startup | SMB\",\n  \"leadScore\": integer between 0 and 100,\n  \"temperature\": \"one of: Cold | Warm | Hot\",\n  \"recommendedAction\": \"one of: Schedule Demo | Send Proposal | Discovery Call | Follow-up Email | Not Qualified\",\n  \"salesNotes\": \"2-3 actionable sentences a sales rep should know before contacting this lead — include buying signals, potential objections, and suggested talking points\"\n}\n\nScoring rules:\n- 80-100 (Hot): Decision maker title, enterprise company, clear buying signal in notes, high-value industry\n- 50-79 (Warm): Relevant role, mid-market company, some intent signals\n- 0-49 (Cold): Junior title, unclear company, missing context, low-value signals\n\nTemperature must match leadScore:\n- Hot = 80-100\n- Warm = 50-79\n- Cold = 0-49",
+              "role": "system"
+            },
+            {
+              "content": "Analyze this lead:\n\nName: {{ $json.fullName }}\nJob Title: {{ $json.jobTitle }}\nCompany: {{ $json.company }}\nWebsite: {{ $json.website }}\nIndustry hint: (infer from company/website)\nEmail: {{ $json.email }}\nCountry: {{ $json.country }}"
+            }
+          ]
+        },
+        "simplify": false,
+        "options": {
+          "maxTokens": 700,
+          "temperature": 0.2
+        }
+      },
+      "id": "3b7440f4-16b4-4978-822e-1b6bf8707c08",
+      "name": "Enrich Lead with OpenAI",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 1.8,
+      "position": [
+        -368,
+        160
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "DSegp8HQfqiTjs7N",
+          "name": "OpenAI account"
+        }
+      },
+      "notes": "GPT-4.1-mini analyzes the lead across 8 dimensions. Temperature 0.2 ensures consistent, analytical output rather than creative responses."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\n// Step 1: Extract raw text from OpenAI response\nlet rawText = '';\ntry {\n  rawText = item.json.choices[0].message.content;\n} catch (e) {\n  rawText = '';\n}\n\n// Step 2: Strip any accidental markdown fences and parse\nlet parsed;\ntry {\n  const cleaned = rawText\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {};\n}\n\n// Step 3: Allowed value sets for validation\nconst validSizes = ['1-10', '11-50', '51-200', '201-1000', '1000+'];\nconst validTypes = ['B2B', 'B2C', 'B2B2C', 'Marketplace', 'Enterprise', 'Startup', 'SMB'];\nconst validTemps = ['Cold', 'Warm', 'Hot'];\nconst validActions = ['Schedule Demo', 'Send Proposal', 'Discovery Call', 'Follow-up Email', 'Not Qualified'];\n\n// Step 4: Parse and clamp leadScore\nconst rawScore = parseInt(parsed.leadScore, 10);\nconst leadScore = isNaN(rawScore) ? 50 : Math.min(100, Math.max(0, rawScore));\n\n// Step 5: Derive temperature from score if AI value is missing or mismatched\nfunction deriveTemperature(score) {\n  if (score >= 80) return 'Hot';\n  if (score >= 50) return 'Warm';\n  return 'Cold';\n}\n\nconst temperature = validTemps.includes(parsed.temperature)\n  ? parsed.temperature\n  : deriveTemperature(leadScore);\n\n// Step 6: Build validated output with safe defaults for every field\nconst result = {\n  companySummary: (typeof parsed.companySummary === 'string' && parsed.companySummary.length > 10)\n    ? parsed.companySummary\n    : 'Company information could not be determined. Manual research recommended.',\n\n  industry: (typeof parsed.industry === 'string' && parsed.industry.length > 0)\n    ? parsed.industry\n    : 'Unknown',\n\n  companySize: validSizes.includes(parsed.companySize)\n    ? parsed.companySize\n    : '11-50',\n\n  businessType: validTypes.includes(parsed.businessType)\n    ? parsed.businessType\n    : 'B2B',\n\n  leadScore,\n\n  temperature,\n\n  recommendedAction: validActions.includes(parsed.recommendedAction)\n    ? parsed.recommendedAction\n    : 'Follow-up Email',\n\n  salesNotes: (typeof parsed.salesNotes === 'string' && parsed.salesNotes.length > 10)\n    ? parsed.salesNotes\n    : 'Insufficient lead data for detailed sales notes. Suggest a discovery call to qualify further.'\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "7c7afe85-52e4-4c19-9786-d61bc4c706b6",
+      "name": "Parse & Validate Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -64,
+        160
+      ],
+      "notes": "Safely parses the OpenAI JSON response. Validates every field against allowed values. Derives temperature from score if AI value is inconsistent. Applies safe defaults for all missing fields."
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {
+          "__rl": true,
+          "value": "1OcTTIOceyZRaHI3oFonuenqY3279AEq3GLx61qMYlPc",
+          "mode": "list",
+          "cachedResultName": "CRM Leads",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OcTTIOceyZRaHI3oFonuenqY3279AEq3GLx61qMYlPc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1OcTTIOceyZRaHI3oFonuenqY3279AEq3GLx61qMYlPc/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "company": "={{ $('Normalize Lead Fields').item.json.company }}",
+            "fullName": "={{ $('Normalize Lead Fields').item.json.fullName }}",
+            "email": "={{ $('Normalize Lead Fields').item.json.email }}",
+            "industry": "={{ $('Parse & Validate Enrichment').item.json.industry }}",
+            "leadScore": "={{ $('Parse & Validate Enrichment').item.json.leadScore }}",
+            "temperature": "={{ $('Parse & Validate Enrichment').item.json.temperature }}",
+            "recommendedAction": "={{ $('Parse & Validate Enrichment').item.json.recommendedAction }}",
+            "companySummary": "={{ $('Parse & Validate Enrichment').item.json.companySummary }}",
+            "salesNotes": "={{ $('Parse & Validate Enrichment').item.json.salesNotes }}"
+          },
+          "matchingColumns": [],
+          "schema": [
+            {
+              "id": "company",
+              "displayName": "company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "fullName",
+              "displayName": "fullName",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "email",
+              "displayName": "email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "industry",
+              "displayName": "industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "leadScore",
+              "displayName": "leadScore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "temperature",
+              "displayName": "temperature",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recommendedAction",
+              "displayName": "recommendedAction",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "companySummary",
+              "displayName": "companySummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "salesNotes",
+              "displayName": "salesNotes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "e15128e3-810a-4bd7-aa02-aee582557ffd",
+      "name": "Log to Google Sheets",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        160,
+        160
+      ],
+      "alwaysOutputData": true,
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "M2jZaqhEpdoc4vX2",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Appends the fully enriched lead record to the CRM Leads sheet. Pulls original lead fields from the Normalize node and enrichment fields from the Parse node."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "crm-cond-002",
+              "leftValue": "={{ $json.leadScore }}",
+              "rightValue": 80,
+              "operator": {
+                "type": "number",
+                "operation": "gte"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "4838eecf-ac6c-47e1-ab87-227a8dc7cb48",
+      "name": "High Value Lead?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        384,
+        160
+      ],
+      "notes": "Routes leads with score >= 80 to the Slack alert branch. All other leads go directly to the final response."
+    },
+    {
+      "parameters": {
+        "select": "channel",
+        "channelId": {
+          "__rl": true,
+          "value": "C0BKRLTPS7Q",
+          "mode": "list",
+          "cachedResultName": "new-channel"
+        },
+        "text": "=={{\"🔥 High Value Lead\\n\\nCompany: \" + $('Normalize Lead Fields').item.json.company + \"\\nName: \" + $('Normalize Lead Fields').item.json.fullName + \"\\nEmail: \" + $('Normalize Lead Fields').item.json.email + \"\\nScore: \" + $('Parse & Validate Enrichment').item.json.leadScore}}",
+        "otherOptions": {}
+      },
+      "id": "702a6a18-9702-4cf7-8d08-88096c90d939",
+      "name": "Notify Sales via Slack",
+      "type": "n8n-nodes-base.slack",
+      "typeVersion": 2.2,
+      "position": [
+        592,
+        16
+      ],
+      "webhookId": "67f3a458-b148-4c82-882f-c0c82645e411",
+      "credentials": {
+        "slackApi": {
+          "id": "O19fX9YHVk8BOxcf",
+          "name": "Slack account"
+        }
+      },
+      "notes": "Sends a rich Block Kit message to the sales Slack channel. Includes all key enrichment fields so the sales rep can act immediately without opening Sheets."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', slackNotified: true, lead: { name: $('Normalize Lead Fields').item.json.fullName, company: $('Normalize Lead Fields').item.json.company, email: $('Normalize Lead Fields').item.json.email, country: $('Normalize Lead Fields').item.json.country, jobTitle: $('Normalize Lead Fields').item.json.jobTitle }, enrichment: { industry: $('Parse & Validate Enrichment').item.json.industry, companySize: $('Parse & Validate Enrichment').item.json.companySize, businessType: $('Parse & Validate Enrichment').item.json.businessType, leadScore: $('Parse & Validate Enrichment').item.json.leadScore, temperature: $('Parse & Validate Enrichment').item.json.temperature, recommendedAction: $('Parse & Validate Enrichment').item.json.recommendedAction, companySummary: $('Parse & Validate Enrichment').item.json.companySummary, salesNotes: $('Parse & Validate Enrichment').item.json.salesNotes } }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "7078cd78-2f2a-40f9-be28-f59fb48b671a",
+      "name": "Respond — High Value Lead",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        16
+      ],
+      "notes": "Returns full enrichment response. slackNotified: true signals the caller that the sales team was alerted."
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ status: 'success', slackNotified: false, lead: { name: $('Normalize Lead Fields').item.json.fullName, company: $('Normalize Lead Fields').item.json.company, email: $('Normalize Lead Fields').item.json.email, country: $('Normalize Lead Fields').item.json.country, jobTitle: $('Normalize Lead Fields').item.json.jobTitle }, enrichment: { industry: $('Parse & Validate Enrichment').item.json.industry, companySize: $('Parse & Validate Enrichment').item.json.companySize, businessType: $('Parse & Validate Enrichment').item.json.businessType, leadScore: $('Parse & Validate Enrichment').item.json.leadScore, temperature: $('Parse & Validate Enrichment').item.json.temperature, recommendedAction: $('Parse & Validate Enrichment').item.json.recommendedAction, companySummary: $('Parse & Validate Enrichment').item.json.companySummary, salesNotes: $('Parse & Validate Enrichment').item.json.salesNotes } }) }}",
+        "options": {
+          "responseCode": 200,
+          "responseHeaders": {
+            "entries": [
+              {
+                "name": "Content-Type",
+                "value": "application/json"
+              }
+            ]
+          }
+        }
+      },
+      "id": "b74963d8-b716-4296-b0f1-151618fe3e2c",
+      "name": "Respond — Standard Lead",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        816,
+        288
+      ],
+      "notes": "Returns full enrichment response. slackNotified: false indicates score was below 80 and no alert was sent."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Normalize Lead Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Lead Fields": {
+      "main": [
+        [
+          {
+            "node": "Email Present?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Email Present?": {
+      "main": [
+        [
+          {
+            "node": "Return Validation Error",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Enrich Lead with OpenAI",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enrich Lead with OpenAI": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Log to Google Sheets",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Log to Google Sheets": {
+      "main": [
+        [
+          {
+            "node": "High Value Lead?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "High Value Lead?": {
+      "main": [
+        [
+          {
+            "node": "Notify Sales via Slack",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Respond — Standard Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Notify Sales via Slack": {
+      "main": [
+        [
+          {
+            "node": "Respond — High Value Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "f15805e9-68ec-46ac-bde7-d66631ff650a",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "89fc1bab796fd2ac53cde955957fa2923d83ae846ca4d462eaed30a7b1d77f82"
+  },
+  "nodeGroups": [],
+  "id": "PpY5ugarxw57DQkX",
+  "tags": [
+    {
+      "updatedAt": "2026-07-25T18:18:08.695Z",
+      "createdAt": "2026-07-25T18:18:08.695Z",
+      "id": "8JTgFUFz3vMiFdEK",
+      "name": "lead-enrichment"
+    },
+    {
+      "updatedAt": "2026-07-25T18:18:08.707Z",
+      "createdAt": "2026-07-25T18:18:08.707Z",
+      "id": "9oczA1WlNB9PVRVX",
+      "name": "google-sheets"
+    },
+    {
+      "updatedAt": "2026-07-25T18:18:08.713Z",
+      "createdAt": "2026-07-25T18:18:08.713Z",
+      "id": "A7AuMD43iZFndI1F",
+      "name": "slack"
+    },
+    {
+      "updatedAt": "2026-07-25T18:18:08.685Z",
+      "createdAt": "2026-07-25T18:18:08.685Z",
+      "id": "G8elLSnd3ySOhhG3",
+      "name": "crm-automation"
+    },
+    {
+      "updatedAt": "2026-07-25T18:18:08.710Z",
+      "createdAt": "2026-07-25T18:18:08.710Z",
+      "id": "guP19HFFS0W4KcCf",
+      "name": "sales-automation"
+    },
+    {
+      "updatedAt": "2026-07-12T08:55:20.350Z",
+      "createdAt": "2026-07-12T08:55:20.350Z",
+      "id": "zLEptWcWohWystrd",
+      "name": "openai"
+    }
+  ]
+}
