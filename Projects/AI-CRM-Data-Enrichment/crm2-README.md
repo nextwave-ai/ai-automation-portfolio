@@ -1,40 +1,85 @@
-# AI CRM Data Enrichment & Sales Intelligence Automation
+# AI CRM Data Enrichment
 
-An AI-powered CRM automation workflow built with **n8n**, **OpenAI GPT-4.1**, **Google Sheets**, and **Slack**.
+## Overview
 
-This workflow enriches incoming CRM leads, analyzes their business value using AI, assigns a lead score, stores the results, and instantly alerts the sales team when a high-value opportunity is detected.
+AI CRM Data Enrichment is an end-to-end n8n automation workflow that enriches incoming CRM lead data using OpenAI before storing the results in Google Sheets and notifying the sales team via Slack.
 
----
+The workflow validates lead information, generates AI-powered insights, identifies high-value opportunities, and creates structured CRM-ready records automatically.
 
-# Business Problem
-
-Sales teams often receive incomplete CRM records that require manual research before outreach.
-
-This process is slow, inconsistent, and causes valuable leads to be overlooked.
-
-This workflow automates the entire enrichment process in seconds.
+Designed for modern sales teams, this workflow reduces manual research while improving lead quality and response speed.
 
 ---
 
-# Solution
+## Business Problem
 
-The workflow automatically:
+Sales teams often receive incomplete lead information from forms, landing pages, or APIs.
 
-- Receives lead data via Webhook
-- Normalizes CRM fields
-- Validates required information
-- Uses OpenAI GPT-4.1 Mini for sales intelligence
-- Calculates Lead Score (0–100)
-- Classifies Lead Temperature
-- Recommends the next sales action
-- Generates AI sales notes
-- Stores results in Google Sheets
-- Sends Slack alerts for high-value leads
-- Returns a structured JSON response
+Sales representatives spend valuable time researching prospects before deciding which leads deserve immediate attention.
+
+This results in:
+
+- Inconsistent lead quality
+- Manual research
+- Slow response times
+- Missed sales opportunities
+- Low CRM data quality
 
 ---
 
-# Workflow Architecture
+## Solution
+
+This workflow automatically enriches every incoming lead using AI.
+
+It validates lead information, generates business insights, identifies high-value prospects, stores enriched data in Google Sheets, and immediately notifies the sales team through Slack.
+
+The entire enrichment process is fully automated.
+
+---
+
+## Key Features
+
+- Webhook Trigger
+- Lead Data Normalization
+- Email Validation
+- AI Data Enrichment
+- Structured JSON Parsing
+- Google Sheets Integration
+- High-Value Lead Detection
+- Slack Notifications
+- Webhook Response
+- End-to-End Workflow Automation
+- Production-Ready Architecture
+
+---
+
+## Workflow
+
+1. Receive lead through Webhook.
+2. Normalize incoming lead data.
+3. Validate email address.
+4. Send lead information to OpenAI.
+5. Generate AI enrichment.
+6. Parse structured JSON response.
+7. Detect high-value opportunities.
+8. Store enriched lead in Google Sheets.
+9. Notify the sales team via Slack.
+10. Return success response through Webhook.
+
+---
+
+## Technology Stack
+
+- n8n
+- OpenAI API
+- Google Sheets API
+- Slack API
+- REST API
+- JSON
+- Webhooks
+
+---
+
+## Workflow Architecture
 
 Webhook
 
@@ -44,15 +89,19 @@ Normalize Lead Fields
 
 ↓
 
-Validate Email
+Email Validation
 
 ↓
 
-OpenAI Lead Enrichment
+OpenAI Enrichment
 
 ↓
 
-JSON Parsing & Validation
+JSON Parsing
+
+↓
+
+High Value Lead Detection
 
 ↓
 
@@ -60,135 +109,78 @@ Google Sheets Logging
 
 ↓
 
-Lead Score Decision
+Slack Notification
 
 ↓
 
-Slack Notification (High Value Leads)
-
-↓
-
-JSON Response
+Webhook Response
 
 ---
 
-# AI Analysis
-
-The AI generates:
-
-- Company Summary
-- Industry Classification
-- Company Size
-- Business Type
-- Lead Score
-- Lead Temperature
-- Recommended Sales Action
-- Sales Notes
-
----
-
-# Technologies
-
-- n8n
-- OpenAI GPT-4.1 Mini
-- Google Sheets API
-- Slack API
-- REST API
-- JavaScript
-- JSON
-
----
-
-# Input Example
+## Example Input
 
 ```json
 {
-  "firstName":"John",
-  "lastName":"Smith",
-  "company":"Acme Inc",
-  "email":"john@acme.com",
-  "website":"https://acme.com",
-  "country":"USA",
-  "jobTitle":"Sales Director"
+  "name": "John Smith",
+  "email": "john@example.com",
+  "company": "Acme Inc.",
+  "industry": "Software"
 }
 ```
 
 ---
 
-# Output Example
+## Example Output
 
 ```json
 {
-  "leadScore":92,
-  "temperature":"Hot",
-  "industry":"SaaS",
-  "recommendedAction":"Schedule Demo"
+  "leadScore": "High",
+  "industry": "Software",
+  "companySize": "Medium",
+  "summary": "High-potential B2B software lead.",
+  "recommendedAction": "Schedule sales call within 24 hours."
 }
 ```
 
 ---
 
-# Key Features
+## Business Value
 
-✔ AI Lead Qualification
+This workflow helps businesses:
 
-✔ CRM Data Enrichment
-
-✔ Sales Intelligence
-
-✔ Automatic Lead Scoring
-
-✔ AI Sales Notes
-
-✔ Google Sheets Logging
-
-✔ Slack Alerts
-
-✔ REST API Ready
-
-✔ Error Handling
-
-✔ JSON Validation
+- Improve CRM data quality
+- Eliminate manual lead research
+- Prioritize high-value opportunities
+- Increase sales efficiency
+- Accelerate response times
+- Standardize lead enrichment
+- Scale CRM operations
 
 ---
 
-# Business Benefits
+## Screenshots
 
-- Reduce manual CRM research
-- Prioritize high-value leads
-- Improve sales response time
-- Standardize lead qualification
-- Increase sales productivity
+- n8n Workflow
+- Google Sheets Output
+- Slack Notification
+- Workflow Execution
 
 ---
 
-# Future Improvements
+## Future Improvements
 
 - HubSpot Integration
 - Salesforce Integration
-- Pipedrive Integration
-- Microsoft Dynamics
-- Email Automation
-- CRM Update API
-- Company Logo Detection
-- Clearbit / Apollo Integration
+- Airtable Support
+- Company Data Enrichment APIs
+- CRM Dashboard
+- Lead Scoring Dashboard
+- Multi-Agent AI Analysis
 
 ---
 
-# Repository
+## Author
 
-workflow.json
-
-README.md
-
-screenshots/
-
-LICENSE
-
----
-
-# Author
+Built by **NextWave AI**
 
 AI Automation Portfolio
-
-Built with n8n + OpenAI
