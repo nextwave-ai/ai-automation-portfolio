@@ -352,13 +352,16 @@ These automation architectures can be adapted for:
 # Repository Structure
 
 ```text
-projects/
+Projects/
 │
-├── enterprise-ai-sales-agent/
-├── ai-crm-data-enrichment/
-├── ai-lead-qualification/
-├── ai-customer-support-ticket-classifier/
-└── ai-proposal-generator/
+├── AI-Appointment-Scheduling-Assistant/
+├── AI-Appointment-Setter-Sheet/
+├── AI-CRM-Automation/
+├── AI-CRM-Data-Enrichment/
+├── AI-Customer-Support-Ticket-Classifier/
+├── AI-Lead-Classifier/
+├── AI-Proposal-Generator/
+└── enterprise-ai-sales-agent/
 
 README.md
 LICENSE
