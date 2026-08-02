@@ -1,0 +1,396 @@
+{
+  "name": "AI CRM Automation",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1T3CzZOvM8vHFwUQnxG9ACV0aTKochbskQ-dvtCTzaoo",
+          "mode": "list",
+          "cachedResultName": "AI CRM Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T3CzZOvM8vHFwUQnxG9ACV0aTKochbskQ-dvtCTzaoo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T3CzZOvM8vHFwUQnxG9ACV0aTKochbskQ-dvtCTzaoo/edit#gid=0"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "803b0419-4a4b-4b83-a6ae-999cffa8d992",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        400,
+        48
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "eBIOwcUtya9Lx2cz",
+          "name": "Google Sheets Trigger account"
+        }
+      },
+      "notes": "Polls the 'Leads Intake' sheet every minute for newly added rows. Any new lead row triggers automatic enrichment."
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "crma-field-001",
+              "name": "row_number",
+              "value": "={{ $json.row_number }}",
+              "type": "number"
+            },
+            {
+              "id": "crma-field-002",
+              "name": "fullName",
+              "value": "={{ $json.Name || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "crma-field-003",
+              "name": "email",
+              "value": "={{ $json.Email || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crma-field-004",
+              "name": "company",
+              "value": "={{ $json.Company || 'Unknown' }}",
+              "type": "string"
+            },
+            {
+              "id": "crma-field-005",
+              "name": "industry",
+              "value": "={{ $json.Industry || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "crma-field-006",
+              "name": "notes",
+              "value": "={{ $json.Notes || '' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8c21a76a-01d6-4b4f-a677-281ba5b6979f",
+      "name": "Normalize Row Data",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        624,
+        48
+      ],
+      "notes": "Maps raw spreadsheet columns into clean, named variables. row_number is kept so the result can be written back to the same row."
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxTokens": 1500,
+          "temperature": 1
+        }
+      },
+      "id": "88605b53-9cdb-4015-9716-0fbaf2ae17a3",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        848,
+        240
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "DSegp8HQfqiTjs7N",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this CRM lead and return ONLY a valid JSON object — no markdown, no explanation, no template placeholders of any kind (never output brackets like [Your Name] or [Company]; use only the real values provided below or write \"Not provided\" if a field is genuinely missing).\n\nLead data:\nName: {{ $json.fullName }}\nEmail: {{ $json.email }}\nCompany: {{ $json.company }}\nIndustry: {{ $json.industry }}\nNotes: {{ $json.notes }}\n\nReturn exactly this JSON structure:\n{\n  \"leadScore\": integer 0-100,\n  \"qualification\": \"one of: Qualified | Needs Nurturing | Not Qualified\",\n  \"enrichmentSummary\": \"2-3 sentences describing the company and opportunity, using only the real data provided\",\n  \"recommendedNextStep\": \"one concrete next action for the sales rep\"\n}"
+      },
+      "id": "0d866e3c-191a-456a-a926-7f3b873ebcca",
+      "name": "Analyze & Enrich Lead",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        848,
+        48
+      ],
+      "notes": "Sends the normalized lead to gpt-4.1-mini. System prompt explicitly forbids placeholder/template output — this is the fix for the earlier bug where unfilled brackets like [Your Name] were written to the sheet."
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\n\n// Step 1: Get raw text from the LLM Chain output\nlet rawText = '';\ntry {\n  rawText = item.json.text || item.json.output || '';\n} catch (e) {\n  rawText = '';\n}\n\n// Step 2: Strip markdown fences and parse JSON\nlet parsed;\ntry {\n  const cleaned = rawText\n    .replace(/```json/gi, '')\n    .replace(/```/g, '')\n    .trim();\n  parsed = JSON.parse(cleaned);\n} catch (e) {\n  parsed = {};\n}\n\n// Step 3: Detect leftover template placeholders (the original bug) and treat as invalid\nfunction hasPlaceholder(value) {\n  return typeof value === 'string' && /\\[(your|company|email|phone|name|title)[^\\]]*\\]/i.test(value);\n}\n\n// Step 4: Allowed values and safe defaults\nconst validQualification = ['Qualified', 'Needs Nurturing', 'Not Qualified'];\n\nconst rawScore = parseInt(parsed.leadScore, 10);\nconst leadScore = isNaN(rawScore) ? 0 : Math.min(100, Math.max(0, rawScore));\n\nconst result = {\n  row_number: $('Normalize Row Data').item.json.row_number,\n  leadScore,\n  qualification: validQualification.includes(parsed.qualification)\n    ? parsed.qualification\n    : 'Needs Nurturing',\n  enrichmentSummary: (typeof parsed.enrichmentSummary === 'string' && parsed.enrichmentSummary.length > 5 && !hasPlaceholder(parsed.enrichmentSummary))\n    ? parsed.enrichmentSummary\n    : 'Insufficient data for a summary. Manual review recommended.',\n  recommendedNextStep: (typeof parsed.recommendedNextStep === 'string' && parsed.recommendedNextStep.length > 3 && !hasPlaceholder(parsed.recommendedNextStep))\n    ? parsed.recommendedNextStep\n    : 'Manually review this lead — automated enrichment was incomplete.'\n};\n\nreturn [{ json: result }];"
+      },
+      "id": "a2827ff6-2f82-4566-b89a-481be012d9e0",
+      "name": "Parse & Validate Enrichment",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1120,
+        48
+      ],
+      "notes": "Parses the AI's JSON output. Rejects any field still containing unfilled template brackets (e.g. [Your Name]) and replaces it with a safe fallback instead of writing broken data to the sheet."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1T3CzZOvM8vHFwUQnxG9ACV0aTKochbskQ-dvtCTzaoo",
+          "mode": "list",
+          "cachedResultName": "AI CRM Automation",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T3CzZOvM8vHFwUQnxG9ACV0aTKochbskQ-dvtCTzaoo/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1T3CzZOvM8vHFwUQnxG9ACV0aTKochbskQ-dvtCTzaoo/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "leadScore": "={{ $json.leadScore }}",
+            "qualification": "={{ $json.qualification }}",
+            "enrichmentSummary": "={{ $json.enrichmentSummary }}",
+            "recommendedNextStep": "={{ $json.recommendedNextStep }}",
+            "Email": "={{ $('Normalize Row Data').item.json.email }}"
+          },
+          "matchingColumns": [
+            "Email"
+          ],
+          "schema": [
+            {
+              "id": "Name",
+              "displayName": "Name",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "Notes",
+              "displayName": "Notes",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "row_number",
+              "displayName": "row_number",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": true
+            },
+            {
+              "id": "leadScore",
+              "displayName": "leadScore",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "qualification",
+              "displayName": "qualification",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "enrichmentSummary",
+              "displayName": "enrichmentSummary",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "recommendedNextStep",
+              "displayName": "recommendedNextStep",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "2540c6b7-faf7-49ae-a21d-aa624f1de515",
+      "name": "Append or Update Row",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        1280,
+        48
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "M2jZaqhEpdoc4vX2",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Writes the validated enrichment fields back into the same row, matched by row_number."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Normalize Row Data",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalize Row Data": {
+      "main": [
+        [
+          {
+            "node": "Analyze & Enrich Lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Analyze & Enrich Lead",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Analyze & Enrich Lead": {
+      "main": [
+        [
+          {
+            "node": "Parse & Validate Enrichment",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parse & Validate Enrichment": {
+      "main": [
+        [
+          {
+            "node": "Append or Update Row",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "760103f5-0df4-4eb7-9687-b30fbc9d6f09",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "89fc1bab796fd2ac53cde955957fa2923d83ae846ca4d462eaed30a7b1d77f82"
+  },
+  "nodeGroups": [],
+  "id": "O092aeRDxo0uJKOj",
+  "tags": [
+    {
+      "updatedAt": "2026-07-25T18:18:08.685Z",
+      "createdAt": "2026-07-25T18:18:08.685Z",
+      "id": "G8elLSnd3ySOhhG3",
+      "name": "crm-automation"
+    },
+    {
+      "updatedAt": "2026-07-25T18:18:08.707Z",
+      "createdAt": "2026-07-25T18:18:08.707Z",
+      "id": "9oczA1WlNB9PVRVX",
+      "name": "google-sheets"
+    },
+    {
+      "updatedAt": "2026-07-12T08:55:20.350Z",
+      "createdAt": "2026-07-12T08:55:20.350Z",
+      "id": "zLEptWcWohWystrd",
+      "name": "openai"
+    },
+    {
+      "updatedAt": "2026-07-19T15:39:41.698Z",
+      "createdAt": "2026-07-19T15:39:41.698Z",
+      "id": "RZhcdgrGYx5XyAIk",
+      "name": "ai-automation"
+    }
+  ]
+}

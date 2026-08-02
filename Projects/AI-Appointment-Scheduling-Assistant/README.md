@@ -33,21 +33,19 @@ This workflow accepts a raw appointment request (name, email, date, time, type, 
 
 ## Workflow Architecture
 
-
 Webhook (POST /appointment-request)
-↓
+        ↓
 Normalize Input (Set)
-↓
+        ↓
 Analyze Request with OpenAI (gpt-4.1-mini)
-↓
+        ↓
 Validate & Structure Response (Code — safe defaults for every field)
-↓
+        ↓
 Urgent or Emergency? (IF)
-┌─────────────┴─────────────┐
-↓                           ↓
+   ┌─────────────┴─────────────┐
+   ↓                           ↓
 Respond — Priority Booking   Respond — Routine Booking
 (X-Appointment-Priority: high) (X-Appointment-Priority: normal)
-
 
 ---
 
@@ -86,7 +84,6 @@ The `Validate & Structure Response` code node parses the AI's JSON output and ap
 
 ## Example Input
 
-```json
 {
   "client_name": "Sarah Johnson",
   "client_email": "sarah@innovatetech.com",
@@ -97,8 +94,8 @@ The `Validate & Structure Response` code node parses the AI's JSON output and ap
   "preferred_channel": "video"
 }
 
+## Example Output
 
-Example Output
 {
   "success": true,
   "priority_flag": false,
@@ -116,38 +113,69 @@ Example Output
   }
 }
 
+---
 
+## Testing
 
-Five test payloads are included in test-payload.json, covering:
+Five test payloads are included in `test-payload.json`, covering:
 
-	1.	Standard demo request → routine, ~60 min, video
-	2.	Urgent support call (tomorrow) → urgent, priority_flag: true
-	3.	Emergency escalation (critical language) → emergency, priority_flag: true
-	4.	Out-of-business-hours onboarding request → is_business_hours: false, alternate slot suggested
-	5.	Minimal/vague input (no type, vague date) → graceful fallback, no workflow failure
+1. Standard demo request → `routine`, ~60 min, video
+2. Urgent support call (tomorrow) → `urgent`, `priority_flag: true`
+3. Emergency escalation (critical language) → `emergency`, `priority_flag: true`
+4. Out-of-business-hours onboarding request → `is_business_hours: false`, alternate slot suggested
+5. Minimal/vague input (no type, vague date) → graceful fallback, no workflow failure
 
 Send any example as a POST request:
+
 curl -X POST https://YOUR-N8N-INSTANCE/webhook/appointment-request \
   -H 'Content-Type: application/json' \
   -d '<payload>'
 
+---
 
+## Setup
 
+1. Import `workflow.json` into n8n.
+2. Add your OpenAI credentials to the **Analyze Request with OpenAI** node.
+3. Activate the workflow to expose the webhook.
+4. Send a test payload from `test-payload.json` to confirm the response.
 
-	•	This workflow does not create a Google Calendar event, send a confirmation email, or check real calendar availability — it only analyzes and structures the request. Calendar/email integration is a natural next step, not yet implemented.
-	•	Date/time parsing relies on the AI model rather than a deterministic date-parsing library, so highly ambiguous input (e.g. “sometime next week”) may return null for validated_date.
-	•	No persistent storage or logging (e.g. Google Sheets) of incoming requests yet.
+No other credentials are required — this workflow does not yet integrate with an external calendar or email provider (see Limitations).
 
-Future Improvements
+---
 
-	•	Google Calendar integration for real availability checks and event creation
-	•	Automated email/SMS confirmation delivery
-	•	Google Sheets logging of all incoming requests
-	•	Deterministic date-parsing fallback for ambiguous input
-	•	Reschedule/cancel endpoints
+## Error Handling
 
-Author
+- Every AI output field is validated against a strict allow-list before use; invalid or missing values fall back to safe defaults instead of failing the workflow.
+- Malformed JSON from the AI (e.g. wrapped in markdown fences) is stripped and re-parsed defensively.
 
-Built by NextWave AI
+---
+
+## Security
+
+No credentials, tokens, or secrets are included in this repository. Configure your own OpenAI credentials in n8n before running.
+
+---
+
+## Limitations
+
+- This workflow does **not** create a Google Calendar event, send a confirmation email, or check real calendar availability — it only analyzes and structures the request. Calendar/email integration is a natural next step, not yet implemented.
+- Date/time parsing relies on the AI model rather than a deterministic date-parsing library, so highly ambiguous input (e.g. "sometime next week") may return `null` for `validated_date`.
+- No persistent storage or logging (e.g. Google Sheets) of incoming requests yet.
+
+---
+
+## Future Improvements
+
+- Google Calendar integration for real availability checks and event creation
+- Automated email/SMS confirmation delivery
+- Google Sheets logging of all incoming requests
+- Deterministic date-parsing fallback for ambiguous input
+- Reschedule/cancel endpoints
+
+---
+
+## Author
+
+Built by **NextWave AI**
 AI Automation Portfolio
-

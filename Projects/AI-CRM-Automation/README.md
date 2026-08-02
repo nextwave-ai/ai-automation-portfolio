@@ -1,169 +1,160 @@
 # AI CRM Automation
 
+## Status
+
+⚙️ **Runnable Workflow — tested end-to-end.** `Workflow.json` is included in this folder and can be imported directly into n8n. Verified with multiple live executions: correctly enriches new leads and correctly updates (not duplicates) existing ones on re-run.
+
+---
+
 ## Overview
 
-AI CRM Automation is an end-to-end n8n workflow that automates CRM operations using AI.
-
-The workflow captures incoming leads, enriches customer information, updates CRM records, triggers notifications, and automates repetitive sales processes without manual intervention.
-
-Designed for modern sales teams, this workflow improves operational efficiency while ensuring accurate and consistent CRM data.
+AI CRM Automation is an n8n workflow that automatically enriches CRM leads the moment they're added to a Google Sheet. Unlike a webhook-based intake system, this workflow is **passive and sheet-driven**: any team member (or another tool) can drop a new lead row into the sheet — no API call, no integration work required on the source side — and the workflow picks it up, analyzes it with AI, and writes the enrichment back into the same row.
 
 ---
 
 ## Business Problem
 
-Managing customer data manually is time-consuming and error-prone.
+Sales and ops teams often collect leads in a spreadsheet from multiple sources — manual entry, CSV imports, other tools exporting into Sheets — before they're ready to build a full CRM integration.
 
-Sales teams often struggle with:
+This creates friction:
 
-- Manual CRM updates
-- Incomplete customer records
-- Delayed lead processing
-- Inconsistent follow-ups
-- Repetitive administrative work
-
-These issues reduce productivity and increase the risk of losing potential customers.
+- Every new row needs manual research before it's useful (industry, sizing, likely intent)
+- There's no consistent scoring or qualification across leads entered by different people
+- Enrichment only happens when someone remembers to do it
 
 ---
 
 ## Solution
 
-This workflow automates the CRM process from lead capture to record management.
-
-Using AI, customer information is analyzed, enriched, and organized automatically before being stored in the CRM system. Team members are notified instantly, allowing them to focus on closing deals instead of administrative tasks.
+This workflow watches a Google Sheet for new rows. Whenever one is added, it normalizes the fields, sends the lead to OpenAI for analysis, validates the AI's response against a strict schema (rejecting any leftover template placeholders), and writes the enriched fields back into the same row — matched by email, so re-running the workflow updates the existing row instead of creating a duplicate.
 
 ---
 
 ## Key Features
 
-- AI Customer Analysis
-- CRM Record Automation
-- Lead Processing
-- Customer Data Enrichment
-- Google Sheets Integration
-- Slack Notifications
-- Automated Workflow Routing
-- JSON Processing
-- Error Handling
-- Production Ready Architecture
+- Google Sheets Trigger (polls for new rows every minute)
+- Row Data Normalization
+- AI Lead Enrichment (leadScore, qualification, summary, next step)
+- Placeholder Detection & Rejection (rejects any leftover `[Your Name]`-style template text from the AI, falls back to a safe message instead)
+- Field-Level Validation with Safe Defaults
+- Match-by-Email Update Logic (prevents duplicate rows on re-run)
 
 ---
 
 ## Workflow
 
-1. Receive customer information.
-2. Validate incoming data.
-3. Process information using OpenAI.
-4. Enrich customer profile.
-5. Update CRM records.
-6. Store structured data.
-7. Notify the sales team.
-8. Complete workflow execution.
+1. Google Sheets Trigger polls the sheet every minute for newly added rows.
+2. Normalize the row's raw columns (Name, Email, Company, Industry, Notes) into clean variables.
+3. Send the normalized lead to OpenAI (via a LangChain LLM Chain + Chat Model) for enrichment.
+4. Parse the AI's JSON response and validate every field — reject and replace any value that still contains unfilled template brackets.
+5. Write the enrichment fields back into the same row, matched by the lead's email address.
 
 ---
 
 ## Technology Stack
 
-- n8n
-- OpenAI API
+- n8n (Google Sheets Trigger, Set, LangChain LLM Chain, LangChain OpenAI Chat Model, Code, Google Sheets)
+- OpenAI via LangChain integration
 - Google Sheets API
-- Slack API
-- REST API
-- JSON
 
 ---
 
 ## Workflow Architecture
 
-Lead Submission
-
-↓
-
-Data Validation
-
-↓
-
-OpenAI Analysis
-
-↓
-
-CRM Enrichment
-
-↓
-
-Record Update
-
-↓
-
-Sales Notification
-
-↓
-
-Workflow Complete
-
----
-
-## Example Input
-
-```json
-{
-  "name": "John Smith",
-  "email": "john@example.com",
-  "company": "Acme Inc.",
-  "industry": "Technology"
-}
+```
+Google Sheets Trigger (poll: every minute, event: row added)
+        ↓
+Normalize Row Data
+        ↓
+Analyze & Enrich Lead (LangChain LLM Chain)
+        ↓ (model)
+   OpenAI Chat Model
+        ↓
+Parse & Validate Enrichment (Code — rejects placeholders, applies safe defaults)
+        ↓
+Append or Update Row (matched by Email)
 ```
 
 ---
 
-## Example Output
+## AI Enrichment Logic
 
-```json
-{
-  "status": "Success",
-  "leadScore": "High",
-  "crmUpdated": true,
-  "notificationSent": true
-}
-```
+The LLM Chain analyzes each lead and returns:
 
----
+- `leadScore`: integer 0–100
+- `qualification`: one of `Qualified | Needs Nurturing | Not Qualified`
+- `enrichmentSummary`: 2–3 sentences on the company and opportunity, using only the real data provided
+- `recommendedNextStep`: one concrete action for the sales rep
 
-## Business Value
+The prompt explicitly instructs the model to never output template placeholders (e.g. `[Your Name]`, `[Company]`) and to write "Not provided" instead of inventing or leaving a field unfilled.
 
-Businesses can:
+### Reliability: AI output is never trusted directly
 
-- Automate CRM management
-- Improve customer data quality
-- Reduce manual work
-- Accelerate lead processing
-- Increase sales efficiency
-- Standardize CRM operations
+The `Parse & Validate Enrichment` code node parses the AI's JSON and:
+- Clamps `leadScore` to the 0–100 range, defaulting to `0` if unparseable
+- Validates `qualification` against an allow-list, defaulting to `Needs Nurturing`
+- Actively scans `enrichmentSummary` and `recommendedNextStep` for leftover template brackets (e.g. `[Your Name]`, `[Company]`) using a regex check, and replaces the entire field with a safe fallback message if any are found — this is a direct fix for an earlier version of this workflow that wrote unfilled template text straight into the CRM.
 
 ---
 
-## Screenshots
+## Example Input (new sheet row)
 
-- n8n Workflow
-- CRM Output
-- Google Sheets
-- Workflow Execution
+| Name | Email | Company | Industry | Notes |
+|---|---|---|---|---|
+| Michael Chen | michael@retailplus.com | RetailPlus Inc | E-commerce | Small team, exploring options, no budget mentioned yet |
+
+## Example Output (written back to the same row)
+
+| leadScore | qualification | enrichmentSummary | recommendedNextStep |
+|---|---|---|---|
+| 50 | Needs Nurturing | RetailPlus Inc is a small e-commerce team currently exploring automation options with no confirmed budget yet. | Schedule a discovery call with Michael Chen to clarify needs, timeline, and decision-making process before proposing a plan. |
+
+---
+
+## Setup
+
+1. Create a Google Sheet with headers: `Name, Email, Company, Industry, Notes, leadScore, qualification, enrichmentSummary, recommendedNextStep`
+2. Import `Workflow.json` into n8n.
+3. Connect your own Google Sheets credentials to both the **Google Sheets Trigger** and **Append or Update Row** nodes, and point them at your sheet.
+4. Connect your own OpenAI credentials to the **OpenAI Chat Model** node.
+5. Activate the workflow (or trigger manually via **Execute workflow** for testing).
+6. Add a new row with lead data to test — the enrichment columns should populate automatically within a minute (or immediately on manual execution).
+
+---
+
+## Error Handling
+
+- If the AI's JSON response is malformed or wrapped in markdown fences, it's stripped and re-parsed defensively; a fully unparseable response falls back to safe defaults across all fields.
+- Any field containing leftover template placeholder text is detected and replaced, rather than being written to the sheet as-is.
+- Matching on email (rather than row position) means re-running the workflow on the same lead updates the existing row instead of creating a duplicate.
+
+---
+
+## Security
+
+No credentials, tokens, or secrets are included in this repository. Configure your own Google Sheets and OpenAI credentials in n8n before running.
+
+---
+
+## Limitations
+
+- Trigger is poll-based (checks every minute), not instant — there's up to a ~60-second delay between a row being added and enrichment appearing.
+- Matching is by email; leads without an email, or with a duplicate email across two different people, won't be handled correctly.
+- No Slack or email notification — enrichment is written to the sheet only. (An earlier version of this README described Slack notifications; that integration does not exist in this workflow. See the separate **AI CRM Data Enrichment** project for a webhook-based workflow with Slack alerting.)
+- No deduplication beyond the email match — if the same email appears in two different rows, only one will reliably get updated.
 
 ---
 
 ## Future Improvements
 
-- HubSpot Integration
-- Salesforce Integration
-- Airtable Support
-- Customer Segmentation
-- Automated Follow-ups
-- Analytics Dashboard
+- Switch to a real-time trigger if/when the data source supports webhooks
+- Add Slack or email alerting for high-scoring leads
+- Deduplication across rows with the same email
+- HubSpot / Salesforce / Airtable sync
 
 ---
 
 ## Author
 
 Built by **NextWave AI**
-
 AI Automation Portfolio
