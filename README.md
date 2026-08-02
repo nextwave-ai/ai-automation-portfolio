@@ -1,31 +1,23 @@
 # AI Automation Portfolio
 
-A portfolio of practical AI automation systems built with n8n, OpenAI, Google Workspace, Slack, Telegram, webhooks, and REST APIs.
+A portfolio of AI-powered business automation systems built with n8n, OpenAI, Google Workspace, Slack, and Telegram.
 
-This repository showcases business-focused automation solutions designed to reduce repetitive manual work, improve operational efficiency, and automate sales, CRM, customer support, and internal business processes using AI.
+Each project combines AI reasoning with deterministic workflow logic — validation, conditional routing, structured data processing, and automated business actions — to build systems that can:
 
-## About
+Receive → Analyze → Decide → Route → Act → Record
 
-This portfolio demonstrates practical AI automation systems designed around real business use cases.
+This is not a collection of isolated AI prompts. Every workflow is designed around a real operational problem, with explicit attention to error handling, data validation, and — where the AI model's output feeds a downstream action — defensive parsing that never lets a malformed AI response break the workflow or reach a client with bad data.
 
-The projects combine AI reasoning with deterministic workflow logic, API integrations, validation, conditional routing, structured data processing, and automated business actions.
+---
 
-Each project focuses on areas such as:
+## Project Status Legend
 
-- AI-powered decision making
-- Business process automation
-- Data validation and normalization
-- Conditional workflow routing
-- API and webhook integrations
-- Structured AI outputs
-- Error handling
-- Multi-system automation
-- Maintainable workflow architecture
-- Real business use cases
+Not every project in this portfolio is at the same maturity level, and that's stated explicitly rather than implied:
 
-The goal is not simply to generate content with AI, but to build systems that can:
+- Runnable Workflow (⚙️) — a working workflow.json is included in the project folder, importable directly into n8n, and has been tested end-to-end.
+- Documented Concept (📄) — the workflow was built and executed in n8n (screenshots included as evidence), but an importable workflow.json is not yet included in this repository.
 
-**Receive → Analyze → Decide → Route → Act → Record**
+No project in this repository is labeled "production-ready." See Project Status below for what that distinction actually means.
 
 ---
 
@@ -33,528 +25,177 @@ The goal is not simply to generate content with AI, but to build systems that ca
 
 ## 1. Enterprise AI Sales Agent
 
-An end-to-end AI-powered B2B sales automation system that analyzes inbound leads, scores buying intent, routes opportunities, schedules meetings, generates personalized outreach, alerts sales teams, and logs sales intelligence automatically.
+Projects/Enterprise-AI-Sales-Agent/ — ⚙️ Runnable Workflow
 
-### Features
+An end-to-end B2B sales automation system. Inbound leads are validated, analyzed by AI across 15 structured intelligence fields (score, temperature, buying intent, qualification, industry, deal value, objections, and more), and routed to either a high-priority path (Calendar booking + personalized AI-generated email + Slack alert) or a nurture path (automated nurture email + Slack queue notification). Every lead is logged to Google Sheets regardless of path.
 
-- Webhook-based lead intake
-- Lead data normalization
-- Required-field validation
-- AI lead scoring from 0–100
-- Cold, Warm, and Hot lead classification
-- Buying intent detection
-- Qualification status classification
-- Industry analysis
-- Company size analysis
-- Business type classification
-- Estimated deal value
-- Buying signal detection
-- Potential objection analysis
-- Recommended sales action
-- Proposal angle generation
-- Personalized conversation opener
-- Automatic qualified/nurture routing
-- Google Calendar meeting scheduling
-- AI-generated personalized sales emails
-- Gmail automation
-- Slack high-priority lead alerts
-- Automated nurture email path
-- Slack nurture queue notifications
-- Google Sheets sales pipeline logging
-- Missing-field error handling
-- Structured webhook responses
+Webhook Lead Intake → Normalize → Validate Required Fields → AI Lead Analysis → Parse & Validate AI Output → Qualify Lead (score ≥ 60?) → [Qualified: Meeting Check → Calendar → Personalized Email → Gmail → Slack] / [Nurture: Nurture Email → Slack] → Google Sheets → Response
 
-### Workflow Architecture
+## 2. AI CRM Data Enrichment
 
-```text
-Webhook Lead Intake
-        ↓
-Normalize Lead Data
-        ↓
-Validate Required Fields
-        ↓
-AI Lead Analysis
-        ↓
-Parse & Validate AI Output
-        ↓
-Lead Qualification
-        ↓
- ┌───────────────────────────┐
- │                           │
-Qualified                 Nurture
- │                           │
- ↓                           ↓
-Meeting Check            Nurture Email
- │                           │
- ↓                           ↓
-Calendar Event           Slack Alert
- │                           │
- ↓                           │
-AI Personalized Email       │
- │                           │
- ↓                           │
-Gmail                       │
- │                           │
- ↓                           │
-Slack Alert                 │
- └─────────────┬─────────────┘
-               ↓
-        Google Sheets
-               ↓
-        API Response
-```
+Projects/AI-CRM-Data-Enrichment/ — ⚙️ Runnable Workflow
 
-### AI Sales Intelligence
+A webhook-based CRM enrichment workflow. Every incoming lead is validated, enriched by AI across 8 dimensions (industry, company size, business type, deal value, buying signals, objections), logged to Google Sheets unconditionally, and — for leads scoring 80 or above — instantly flagged to the sales team via Slack.
 
-The AI analysis engine generates structured sales intelligence including:
+Webhook → Normalize → Email Present? → AI Enrichment → Parse & Validate → Google Sheets → High Value Lead? → [Slack Alert] → Response
 
-- Lead Score
-- Temperature
-- Intent
-- Qualification Status
-- Industry
-- Company Size
-- Business Type
-- Estimated Deal Value
-- Company Summary
-- Buying Signals
-- Potential Objections
-- Recommended Action
-- Proposal Angle
-- Personalized Opener
+## 3. AI CRM Automation
 
-Example:
+Projects/AI-CRM-Automation/ — ⚙️ Runnable Workflow
 
-```json
-{
-  "leadScore": 92,
-  "temperature": "Hot",
-  "intent": "Ready to Buy",
-  "qualificationStatus": "Sales Ready",
-  "industry": "Unknown",
-  "companySize": "11-50",
-  "businessType": "B2B",
-  "estimatedDealValue": "$25K-$100K",
-  "recommendedAction": "Schedule Demo"
-}
-```
+A passive, sheet-driven companion to the webhook-based CRM Enrichment project above. Instead of receiving leads via API, this workflow watches a Google Sheet directly — any team member can drop in a new row with no integration work, and the lead is automatically scored and enriched in place. Updates are matched by email, so re-running the workflow never creates duplicate rows.
 
-### Tested Scenarios
+Google Sheets Trigger (new row) → Normalize → AI Enrichment (LangChain LLM Chain) → Validate & Reject Placeholders → Update Row (matched by Email)
 
-The workflow has been tested across multiple execution paths.
+## 4. AI Appointment Scheduling Assistant
 
-**High-Priority Lead**
+Projects/AI-Appointment-Scheduling-Assistant/ — ⚙️ Runnable Workflow
 
-```text
-Lead Intake
-→ Validation
-→ AI Analysis
-→ High-Priority Routing
-→ Google Calendar
-→ Personalized Email
-→ Gmail
-→ Slack
-→ Google Sheets
-→ Success Response
-```
+An intelligent triage and pre-processing layer for appointment requests. Rather than booking meetings directly, it analyzes each request with AI to determine urgency (routine / urgent / emergency), suggest a time slot, estimate meeting duration, and draft a client confirmation message — producing clean, structured data for a downstream booking system or human to act on.
 
-**Nurture Lead**
+Webhook → Normalize → AI Analysis → Validate & Structure Response → Urgent or Emergency? → [Priority Response] / [Routine Response]
 
-```text
-Lead Intake
-→ Validation
-→ AI Analysis
-→ Nurture Routing
-→ Nurture Email
-→ Slack Nurture Queue
-→ Google Sheets
-→ Success Response
-```
+## 5. AI Appointment Setter Sheet
 
-**Invalid Lead**
+Projects/AI-Appointment-Setter-Sheet/ — ⚙️ Runnable Workflow
 
-```text
-Lead Intake
-→ Normalization
-→ Validation
-→ Missing Required Fields Error
-```
+Drafts a personalized outreach email for every new lead added to a Google Sheet. The design deliberately separates the AI-written part (the email body) from a fixed, human-edited sender signature — so the signature can never contain an unfilled template placeholder, a failure mode this project was specifically rebuilt to eliminate.
 
-Invalid leads are stopped before AI processing and downstream sales actions.
+Google Sheets Trigger → Normalize → Sender Info (fixed values) → AI Email Body → Reject Placeholders & Append Signature → Update Row
 
----
+## 6. AI Customer Support Ticket Classifier
 
-## 2. AI CRM Data Enrichment & Sales Intelligence
+Projects/AI-Customer-Support-Ticket-Classifier/ — ⚙️ Runnable Workflow
 
-An AI-powered CRM enrichment workflow that transforms raw lead data into structured sales intelligence.
+Automatically analyzes incoming support requests, classifies intent, assigns priority, and returns a structured result for downstream routing — reducing manual ticket triage.
 
-The workflow validates incoming CRM data, analyzes company information using AI, enriches sales records, and generates actionable information for sales teams.
+## 7. AI Lead Classifier
 
-### Features
+Projects/AI-Lead-Classifier/ — 📄 Documented Concept
 
-- CRM data normalization
-- Lead validation
-- AI company analysis
-- Industry classification
-- Company size detection
-- Business type detection
-- AI lead scoring from 0–100
-- Lead temperature classification
-- Sales recommendations
-- AI-generated sales notes
-- Google Sheets logging
-- Slack notifications
-- Structured JSON API responses
+Scores company leads on a 0–10 scale with a written justification, using a Google Sheets-triggered LLM chain, and sends an instant Telegram alert for scores above 7. Built and executed in n8n (see included Google Sheets and Telegram screenshots); an importable workflow.json is not yet included — see the project's Setup section to rebuild it.
 
----
+## 8. AI Proposal Generator
 
-## 3. AI Lead Qualification & Scoring Automation
+Projects/AI-Proposal-Generator/ — 📄 Documented Concept
 
-An automated lead qualification workflow that uses AI to analyze and prioritize inbound sales leads.
-
-The system helps sales teams identify higher-value opportunities and reduce manual lead review.
-
-### Features
-
-- AI lead scoring
-- Lead qualification
-- Automated decision making
-- Sales prioritization
-- Google Sheets integration
-- Telegram notifications
-- Structured lead processing
-
----
-
-## 4. AI Customer Support Ticket Classifier
-
-An AI-powered customer support workflow that automatically analyzes incoming support requests and classifies them for further processing.
-
-### Features
-
-- Support ticket classification
-- AI intent detection
-- Priority assignment
-- Automatic routing
-- Structured JSON output
-- Reduced manual ticket triage
-
----
-
-## 5. AI Proposal Generator
-
-An AI automation workflow designed to generate structured client proposals based on project requirements.
-
-### Features
-
-- Automated proposal generation
-- Pricing suggestions
-- Delivery estimates
-- AI-generated proposal content
-- Structured project information processing
+Generates a structured client proposal (scope, pricing, timeline) from project requirements using OpenAI. Built and executed in n8n (see included screenshots); an importable workflow.json is not yet included in this repository.
 
 ---
 
 # Technology Stack
 
-## Workflow Automation
+Workflow Automation: n8n
 
-- n8n
+Artificial Intelligence: OpenAI API (gpt-4.1-mini), LangChain nodes (LLM Chain, Chat Model, Output Parser), structured/validated AI outputs, prompt engineering
 
-## Artificial Intelligence
+Google Workspace: Gmail, Google Calendar, Google Sheets
 
-- OpenAI API
-- GPT models
-- Structured AI outputs
-- Prompt engineering
+Communication: Slack, Telegram
 
-## Google Workspace
+APIs & Data: REST APIs, Webhooks, JSON, HTTP Request
 
-- Gmail
-- Google Calendar
-- Google Sheets
-- Google APIs
-
-## Communication
-
-- Slack
-- Telegram
-- Gmail
-
-## APIs & Data
-
-- REST APIs
-- Webhooks
-- JSON
-- HTTP requests
-
-## Development
-
-- JavaScript
-- JSON
-- API integration
-- Workflow logic
-- Conditional routing
+Development: JavaScript (Code nodes), conditional routing, deterministic validation logic
 
 ---
 
 # Skills Demonstrated
 
-This portfolio demonstrates practical experience with:
-
-- AI Workflow Automation
-- Business Process Automation
-- Sales Automation
-- CRM Automation
-- Lead Qualification
-- Lead Enrichment
-- AI Decision Systems
-- Prompt Engineering
-- API Integration
-- REST APIs
-- Webhook Development
-- Google Workspace Automation
-- Slack Automation
-- Telegram Automation
-- Email Automation
-- Conditional Workflow Routing
-- Error Handling
-- Data Validation
-- Data Normalization
-- JSON Processing
-- Structured AI Outputs
-- Multi-System Integration
-- Workflow Testing
-- Business Logic Design
-- Technical Documentation
+- AI workflow automation and prompt engineering
+- Business process, sales, and CRM automation
+- Lead qualification and enrichment
+- AI decision systems with deterministic validation layers
+- Webhook and Google Sheets-triggered architectures
+- API integration (OpenAI, Google Workspace, Slack, Telegram)
+- Conditional workflow routing and error handling
+- Data validation and normalization
+- Structured AI output design (allow-lists, safe defaults, placeholder rejection)
+- Multi-system integration and workflow testing
+- Technical documentation and honest project status reporting
 
 ---
 
 # Business Use Cases
 
-These automation architectures can be adapted for:
-
-- B2B Sales Teams
-- Marketing Agencies
-- SaaS Companies
-- Consulting Businesses
-- Service Companies
-- CRM Management
-- Lead Generation
-- Customer Support
-- Sales Operations
-- Client Onboarding
-- Internal Operations
-- Business Process Automation
+These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management, lead generation, customer support, sales operations, client onboarding, and internal operations automation.
 
 ---
 
 # Repository Structure
 
-```text
-Projects/
-│
-├── AI-Appointment-Scheduling-Assistant/
-├── AI-Appointment-Setter-Sheet/
-├── AI-CRM-Automation/
-├── AI-CRM-Data-Enrichment/
-├── AI-Customer-Support-Ticket-Classifier/
-├── AI-Lead-Classifier/
-├── AI-Proposal-Generator/
-└── enterprise-ai-sales-agent/
+Projects/ contains: AI-Appointment-Scheduling-Assistant, AI-Appointment-Setter-Sheet, AI-CRM-Automation, AI-CRM-Data-Enrichment, AI-Customer-Support-Ticket-Classifier, AI-Lead-Classifier, AI-Proposal-Generator, Enterprise-AI-Sales-Agent — plus README.md and LICENSE at the repository root.
 
-README.md
-LICENSE
-```
-
-Individual project folders may contain:
-
-```text
-project-name/
-│
-├── workflow/
-│   └── workflow.json
-│
-├── screenshots/
-│
-└── README.md
-```
-
-Each project README documents the workflow architecture, integrations, business use case, setup requirements, and relevant implementation details.
+Each project folder contains a README.md (business problem, architecture, setup, limitations), a workflow.json where available, and screenshots as supporting evidence.
 
 ---
 
 # Workflow Design Principles
 
-The workflows in this portfolio are designed around several core principles.
+1. Validate Before AI Processing — invalid or incomplete data is rejected before any AI or external API call is made.
 
-### 1. Validate Before AI Processing
+2. Structured AI Output, Never Trusted Directly — AI responses use structured JSON, and downstream code nodes validate every field against an allow-list with safe defaults, so a malformed or inconsistent AI response can never break the workflow or reach a client with bad data.
 
-Invalid or incomplete data should be detected before unnecessary AI or external API calls are made.
+3. AI + Deterministic Logic — AI handles classification, analysis, and personalization; deterministic logic handles routing, validation, integrations, and business actions.
 
-### 2. Structured AI Output
+4. Business-Focused Automation — each workflow solves a recognizable operational problem, not just a technical demonstration.
 
-Where appropriate, AI responses use structured JSON outputs so that downstream workflow logic can process results reliably.
+5. Honest Status Reporting — a project is only called "runnable" if an importable, tested workflow.json is included. Screenshots alone are labeled as a documented concept, not a working deliverable.
 
-### 3. AI + Deterministic Logic
-
-AI is used for tasks such as classification, analysis, personalization, and reasoning.
-
-Deterministic workflow logic is used for routing, validation, integrations, and business actions.
-
-### 4. Business-Focused Automation
-
-Each workflow should solve a recognizable operational problem rather than exist only as a technical demonstration.
-
-### 5. Error Handling
-
-Important failure scenarios are considered so invalid data does not silently continue through downstream systems.
-
-### 6. Modular Architecture
-
-Workflows are structured into logical stages such as:
-
-```text
-Input
-→ Validation
-→ Processing
-→ AI Analysis
-→ Decision
-→ Action
-→ Logging
-→ Response
-```
+6. Modular Architecture: Input → Validation → Processing → AI Analysis → Decision → Action → Logging → Response
 
 ---
 
 # Installation
 
-Individual workflows can be imported into n8n.
-
-General setup process:
-
-1. Download the required workflow JSON file.
-2. Import the workflow into n8n.
-3. Configure your own credentials.
-4. Update environment-specific IDs and references.
-5. Configure required APIs.
-6. Update email addresses, spreadsheets, calendars, channels, and webhook settings.
-7. Test every workflow branch.
-8. Review security settings before deployment.
-
-Depending on the project, credentials may be required for:
-
-- OpenAI
-- Gmail
-- Google Calendar
-- Google Sheets
-- Slack
-- Telegram
-- Other external APIs
+1. Download the workflow.json for the project you want (where available — see status badges above).
+2. Import it into n8n.
+3. Configure your own credentials (OpenAI, Google Workspace, Slack, Telegram as needed).
+4. Update environment-specific IDs — spreadsheet IDs, calendar IDs, Slack channels, webhook paths.
+5. Test every workflow branch before relying on it.
 
 ---
 
 # Security
 
-Credentials and secrets are intentionally not included in this repository.
-
-Never commit:
-
-- API keys
-- OAuth client secrets
-- Access tokens
-- Refresh tokens
-- Slack tokens
-- Telegram bot tokens
-- Passwords
-- `.env` files containing secrets
-- Private credentials
-
-All integrations should be configured using your own credentials and environment.
-
-Exported workflow files should always be reviewed for sensitive or environment-specific information before being published publicly.
+Credentials and secrets are intentionally not included in this repository. Never commit API keys, OAuth client secrets, access tokens, refresh tokens, Slack/Telegram tokens, .env files, or passwords. All integrations must be configured using your own credentials and environment. Exported workflow files should always be reviewed for sensitive or environment-specific information before being published publicly.
 
 ---
 
 # Project Status
 
-The projects in this repository are portfolio and demonstration implementations.
+The projects in this repository are portfolio and demonstration implementations. Most have been tested end-to-end across multiple execution paths, including success, error, and edge-case scenarios — see each project's own README for its specific test coverage.
 
-Some workflows have been tested end-to-end across multiple execution paths, including success, nurture, qualification, and validation/error scenarios.
-
-Portfolio-tested does not automatically mean production-ready.
-
-Production deployment may require additional controls such as:
-
-- Authentication
-- Rate limiting
-- Retry strategies
-- Centralized error handling
-- Monitoring
-- Logging
-- Duplicate protection
-- Idempotency
-- API failure handling
-- Data privacy controls
-- Environment management
-- Security hardening
+Portfolio-tested does not mean production-ready. Production deployment would require additional work: authentication, rate limiting, retry strategies, centralized error handling, monitoring, duplicate protection beyond simple key-matching, API failure handling, data privacy controls, environment management, and security hardening.
 
 ---
 
 # Future Development
 
-Future projects will focus on expanding the portfolio into more advanced AI automation architectures rather than repeating existing workflow patterns.
+Future projects will prioritize technical capabilities not yet represented in this portfolio, rather than repeating existing patterns:
 
-Potential areas include:
-
-- AI Document Processing
-- AI Knowledge Base / RAG Systems
-- AI Operations Agents
-- Advanced CRM Automation
-- Multi-Agent Business Workflows
-- Automated Business Reporting
+- External REST API integrations with authentication, pagination, and retry logic
+- Document processing and RAG / vector search systems
+- AI agents with tool calling and multi-step reasoning
+- Human-in-the-loop approval workflows
+- Sub-workflows and reusable components
 
 ---
 
 # Portfolio Goal
 
-The goal of this repository is to demonstrate the ability to design and build practical AI automation systems that connect AI models with real business tools and operational workflows.
-
-The focus is on moving beyond isolated AI prompts toward complete automation systems that can:
-
-**Analyze → Decide → Route → Act → Record**
-
-The portfolio is progressively expanding toward more advanced automation architecture, AI agents, and client-oriented business systems.
+To demonstrate the ability to design and build practical AI automation systems that connect AI models with real business tools — moving beyond isolated AI prompts toward complete systems that Analyze → Decide → Route → Act → Record.
 
 ---
 
 # Contact
 
-Open to freelance and project opportunities involving:
-
-- AI Automation
-- n8n Development
-- OpenAI Integrations
-- CRM Automation
-- Sales Automation
-- Business Workflow Automation
-- API Integrations
-
-Contact information can be found through my GitHub profile.
+Open to freelance and project opportunities involving AI automation, n8n development, OpenAI integrations, CRM and sales automation, and business workflow automation. Contact information can be found through my GitHub profile.
 
 ---
 
 # Built With
 
-- n8n
-- OpenAI
-- Google Workspace
-- Slack
-- Telegram
-- REST APIs
-- Webhooks
-- JavaScript
-- JSON
+n8n · OpenAI · Google Workspace · Slack · Telegram · REST APIs · Webhooks · JavaScript · JSON
 
 ---
 
