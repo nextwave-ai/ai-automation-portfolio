@@ -1,0 +1,395 @@
+{
+  "name": "AI Lead Classifier",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1DOYhdLTdU1IEVsomKl87EBtGEkaRSCkGFrt2ny8Ewkc",
+          "mode": "list",
+          "cachedResultName": "AI Lead Classifier",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1DOYhdLTdU1IEVsomKl87EBtGEkaRSCkGFrt2ny8Ewkc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1DOYhdLTdU1IEVsomKl87EBtGEkaRSCkGFrt2ny8Ewkc/edit#gid=0"
+        },
+        "options": {}
+      },
+      "id": "e55729b4-0379-4cdb-ac33-fc234222e6e2",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        -1104,
+        16
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "eBIOwcUtya9Lx2cz",
+          "name": "Google Sheets Trigger account"
+        }
+      },
+      "notes": "Fires on any row added or updated in the lead sheet."
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Analyze this company as a potential lead for AI automation services and return ONLY a valid JSON object — no markdown, no explanation.\n\nCompany: {{ $json.Company }}\nWebsite: {{ $json.Website }}\nEmail: {{ $json.Email }}\nIndustry: {{ $json.Industry }}\n\nReturn exactly this JSON structure:\n{\n  \"score\": integer 0-10,\n  \"reason\": \"2-3 sentences explaining the strategic fit and reasoning for this score\"\n}\n\nScoring guide:\n- 8-10: Strong explicit interest in automation, integrations, or workflow optimization; company profile clearly suggests they would buy external automation services.\n- 5-7: Plausible fit but with factors (deep in-house technical capability, unclear buying need) that reduce likelihood.\n- 0-4: Weak or no fit — unrelated industry, insufficient information, or clearly not a target."
+      },
+      "id": "0e795d0f-1e49-411f-acd5-30d9bd4f68c0",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        -880,
+        16
+      ],
+      "notes": "Scores each company lead 0-10 with a written justification, using a structured Output Parser to enforce JSON shape."
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxTokens": 500
+        }
+      },
+      "id": "bd2fc2ce-fd05-41a0-82ee-052fcce9ef36",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        -944,
+        208
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "DSegp8HQfqiTjs7N",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "manual",
+        "inputSchema": "{\n  \"type\": \"object\",\n  \"properties\": {\n    \"score\": { \"type\": \"number\" },\n    \"reason\": { \"type\": \"string\" }\n  },\n  \"required\": [\"score\", \"reason\"]\n}"
+      },
+      "id": "d0e683e7-7b25-4dea-be6c-33e262af0323",
+      "name": "Output Parser",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.2,
+      "position": [
+        -720,
+        208
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "const item = $input.first();\nconst row = $('Google Sheets Trigger').item.json;\n\n// Extract raw text — could be a JSON string that needs parsing\nlet rawText = '';\ntry {\n  rawText = item.json.text || item.json.output || '';\n} catch (e) {\n  rawText = '';\n}\n\n// If rawText is already an object (Output Parser was on), use it directly\nlet parsed;\nif (typeof rawText === 'object' && rawText !== null) {\n  parsed = rawText;\n} else {\n  // Otherwise it's a string — strip markdown fences and parse it\n  try {\n    const cleaned = String(rawText)\n      .replace(/```json/gi, '')\n      .replace(/```/g, '')\n      .trim();\n    parsed = JSON.parse(cleaned);\n  } catch (e) {\n    parsed = {};\n  }\n}\n\n// Clamp score to 0-10 range with a safe default\nconst rawScore = parseFloat(parsed.score);\nconst score = isNaN(rawScore) ? 0 : Math.min(10, Math.max(0, rawScore));\n\n// Safe fallback for reason\nconst reason = (typeof parsed.reason === 'string' && parsed.reason.length > 5)\n  ? parsed.reason\n  : 'Insufficient data to generate a reliable justification. Manual review recommended.';\n\n// Derive status deterministically from score, not from AI\nconst status = score > 7 ? 'Qualified' : (score >= 4 ? 'Needs Review' : 'Not Qualified');\n\nreturn [{\n  json: {\n    Company: row.Company,\n    Website: row.Website,\n    Email: row.Email,\n    Industry: row.Industry,\n    Score: score,\n    Reason: reason,\n    Status: status\n  }\n}];"
+      },
+      "id": "10b25957-58eb-4387-b616-7cb531e7cb69",
+      "name": "Validate Score",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        -512,
+        16
+      ],
+      "notes": "Clamps score to 0-10, applies a safe fallback reason if the AI response is too short or missing, and derives Status deterministically from the numeric score rather than trusting an AI-generated status label."
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1DOYhdLTdU1IEVsomKl87EBtGEkaRSCkGFrt2ny8Ewkc",
+          "mode": "list",
+          "cachedResultName": "AI Lead Classifier",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1DOYhdLTdU1IEVsomKl87EBtGEkaRSCkGFrt2ny8Ewkc/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "Company": "={{ $json.Company }}",
+            "Score": "={{ $json.Score }}",
+            "Reason": "={{ $json.Reason }}",
+            "Status": "={{ $json.Status }}"
+          },
+          "matchingColumns": [
+            "Company"
+          ],
+          "schema": [
+            {
+              "id": "Company",
+              "displayName": "Company",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Website",
+              "displayName": "Website",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Email",
+              "displayName": "Email",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Industry",
+              "displayName": "Industry",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "Score",
+              "displayName": "Score",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Reason",
+              "displayName": "Reason",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "c54bb8a2-55a4-499b-a827-6e79bd09dac0",
+      "name": "Update Google Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        -304,
+        16
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "M2jZaqhEpdoc4vX2",
+          "name": "Google Sheets account"
+        }
+      },
+      "notes": "Writes Score, Reason, and Status back into the matching row, identified by Company name."
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "alc-cond-001",
+              "leftValue": "={{ $json.Score }}",
+              "rightValue": 7,
+              "operator": {
+                "type": "number",
+                "operation": "gt"
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "9cde5696-822a-45fd-9f3f-11dca11e4b01",
+      "name": "If Score > 7",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        -128,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "chatId": "REPLACE_WITH_YOUR_CHAT_ID",
+        "text": "=🔥 New High-Quality Lead\n\nCompany: {{ $json.Company }}\nIndustry: {{ $json.Industry }}\nScore: {{ $json.Score }}\n\nReason: {{ $json.Reason }}",
+        "additionalFields": {}
+      },
+      "id": "1fd188f9-9902-4085-8123-cab86ae79fce",
+      "name": "Telegram Notification",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.2,
+      "position": [
+        80,
+        -96
+      ],
+      "webhookId": "f5751464-5f15-4fef-ad86-fb8e440cb4e8",
+      "credentials": {
+        "telegramApi": {
+          "id": "VXBrOZrIjb2NLmoc",
+          "name": "Telegram account"
+        }
+      },
+      "notes": "Sends an instant alert only for leads scoring above 7."
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Output Parser": {
+      "ai_outputParser": [
+        []
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Validate Score",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Score": {
+      "main": [
+        [
+          {
+            "node": "Update Google Sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Update Google Sheet": {
+      "main": [
+        [
+          {
+            "node": "If Score > 7",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If Score > 7": {
+      "main": [
+        [
+          {
+            "node": "Telegram Notification",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "59bd8705-a574-477a-9bef-65dd5c89a49c",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "89fc1bab796fd2ac53cde955957fa2923d83ae846ca4d462eaed30a7b1d77f82"
+  },
+  "nodeGroups": [],
+  "id": "eUWMpuBn8TAl1Hlv",
+  "tags": [
+    {
+      "updatedAt": "2026-07-25T18:18:08.707Z",
+      "createdAt": "2026-07-25T18:18:08.707Z",
+      "id": "9oczA1WlNB9PVRVX",
+      "name": "google-sheets"
+    },
+    {
+      "updatedAt": "2026-08-06T15:51:34.736Z",
+      "createdAt": "2026-08-06T15:51:34.736Z",
+      "id": "9tE3ETu9H5SnkxpQ",
+      "name": "lead-scoring"
+    },
+    {
+      "updatedAt": "2026-08-06T15:51:34.744Z",
+      "createdAt": "2026-08-06T15:51:34.744Z",
+      "id": "CwbIGxTBZw7ChkJn",
+      "name": "telegram"
+    },
+    {
+      "updatedAt": "2026-07-12T08:55:20.350Z",
+      "createdAt": "2026-07-12T08:55:20.350Z",
+      "id": "zLEptWcWohWystrd",
+      "name": "openai"
+    }
+  ]
+}
