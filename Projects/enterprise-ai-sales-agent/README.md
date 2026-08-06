@@ -2,7 +2,7 @@
 
 ## Status
 
-⚙️ **Runnable Workflow — tested end-to-end.** `Enterprise AI Sales Agent.json` is included in this folder and can be imported directly into n8n. Tested across high-priority, nurture, and missing-field validation paths, including verified Slack notifications.
+⚙️ **Runnable Workflow — tested end-to-end via live webhook requests.** `Enterprise AI Sales Agent.json` is included in this folder and can be imported directly into n8n. All three execution paths (high-priority, nurture, and missing-field validation) were tested by sending real HTTP POST requests to the workflow's webhook endpoint and verifying every downstream node — including Slack, Gmail, Google Calendar, and Google Sheets — executed successfully.
 
 An end-to-end AI-powered B2B sales automation workflow built with n8n and OpenAI.
 
@@ -50,7 +50,7 @@ The AI engine (OpenAI `gpt-4.1-mini`) generates structured sales intelligence in
 - Company Summary, Buying Signals, Potential Objections
 - Recommended Action, Proposal Angle, Personalized Opener
 
-Example:
+Example (from an actual test run):
 
 ```json
 {
@@ -117,11 +117,13 @@ Webhook — Lead Intake → Normalize Lead Data → Validate Required Fields →
 
 ## Tested Scenarios
 
-**High-Priority Lead** — tested with a high-intent lead requesting a sales demo. Path: Webhook → Validation → AI Analysis → High-Priority Routing → Calendar Event → Personalized Email → Gmail → Slack Alert → Google Sheets → Success Response.
+All three scenarios below were tested by sending real HTTP POST requests to the workflow's live webhook endpoint (not just manually executing individual nodes), confirming the complete path executes correctly end to end, including all external API calls.
 
-**Nurture Lead** — tested with a lead researching AI automation without immediate buying intent. Path: Webhook → Validation → AI Analysis → Nurture Routing → Nurture Email → Slack Nurture Queue → Google Sheets → Success Response. Slack alert correctly displays the lead's real name and company.
+**High-Priority Lead** — sent a high-intent lead (Head of Sales, explicit demo request). Full path executed successfully: Webhook → Validation → AI Analysis (scored 92, Hot, Sales Ready) → High-Priority Routing → Calendar Event Created → Personalized Email Generated → Gmail Send → Slack High-Priority Alert → Google Sheets Row Logged → 200 Success Response.
 
-**Missing Required Fields** — tested with incomplete lead data. Path: Webhook → Normalization → Validation → Missing Required Fields Error. AI processing and downstream sales actions are not executed for invalid leads.
+**Nurture Lead** — sent a low-intent lead (Intern, no specific project, just browsing). Full path executed successfully: Webhook → Validation → AI Analysis → Nurture Routing → Nurture Email Sent → Slack Nurture Queue Alert → Google Sheets Row Logged → 200 Success Response.
+
+**Missing Required Fields** — sent a lead with an empty company and no email. Workflow correctly stopped at validation: Webhook → Normalization → Validation → Missing Required Fields Error (HTTP 400), before any AI processing or downstream sales actions.
 
 ## Installation
 
@@ -134,7 +136,7 @@ Webhook — Lead Intake → Normalize Lead Data → Validate Required Fields →
 
 ## Required Google APIs
 
-Depending on your configuration, enable the required APIs in your Google Cloud project: Google Calendar API, Google Sheets API, Gmail API, Google Drive API.
+Depending on your configuration, enable the required APIs in your Google Cloud project: Google Calendar API, Google Sheets API, Gmail API, Google Drive API (required alongside Sheets API for OAuth-based spreadsheet access).
 
 ## Security
 
@@ -145,6 +147,7 @@ Credentials and secrets are intentionally not included in this repository. Never
 - AI-derived fields like industry and company size are inferred from limited input, not looked up from a verified data source.
 - No retry logic if the Gmail, Calendar, Slack, or Sheets API call fails mid-workflow.
 - No deduplication: the same lead submitted twice will be processed and logged twice.
+- Google OAuth credentials (Calendar, Gmail, Sheets) may require periodic reconnection depending on your Google Cloud OAuth consent screen's publishing status.
 
 ## Project Goal
 
