@@ -2,162 +2,106 @@
 
 ## Overview
 
-AI Proposal Generator is an intelligent n8n automation workflow that creates professional business proposals using OpenAI.
+AI Proposal Generator is an n8n automation that watches a Google Sheet for new incoming job leads and automatically drafts a ready-to-send freelance proposal message for each one using OpenAI.
 
-The workflow collects client requirements, analyzes project details, generates a customized proposal, and delivers a polished document ready for review or submission.
+When a new row is added with job details (title, description, client needs, suggested price, delivery time), the workflow generates a personalized proposal message and writes it back into the same row — no manual copy-pasting or proposal writing required.
 
-Designed for freelancers, agencies, consultants, and sales teams, this automation significantly reduces proposal writing time while maintaining professional quality.
+---
+
+## Status
+
+⚙️ Runnable Workflow — tested end-to-end in n8n with a live Google Sheet and OpenAI credentials. All nodes execute successfully on new row addition.
 
 ---
 
 ## Business Problem
 
-Writing proposals manually for every client is repetitive and time-consuming.
+Freelancers and agencies fielding multiple leads spend significant time writing a first-draft proposal message for every inquiry:
 
-Businesses often face:
-
-- Slow response times
-- Inconsistent proposal quality
-- Missed sales opportunities
-- Repetitive document creation
-- High administrative workload
+- Repetitive, similar messages written from scratch each time
+- Slower response time to new leads
+- Inconsistent tone or missing details across proposals
+- Manual tracking of what's been quoted to whom
 
 ---
 
 ## Solution
 
-This workflow automates the proposal creation process.
+This workflow turns a Google Sheet into a lightweight lead-to-proposal pipeline. As soon as a new lead row is added, AI drafts a complete, personalized proposal message referencing the client's specific job details, price, and timeline — written back into the sheet, ready to review and send.
 
-After receiving client information and project requirements, OpenAI generates a customized proposal that can be reviewed, edited, and delivered within minutes.
+---
+
+## Workflow Architecture
+
+Google Sheets Trigger (Row Added) → Basic LLM Chain (OpenAI) → Validate Proposal (Code) → Append or Update Row in Sheet [matched on: JobTitle]
+
+**Trigger:** Polls the sheet and fires only on newly added rows (not on every edit), preventing re-trigger loops when the workflow writes its own output back to the row.
+
+**Generation:** An LLM Chain node, backed by an OpenAI Chat Model, reads the row's JobTitle, JobDescription, ClientNeeds, SuggestedPrice, and DeliveryTime, and generates a first-person proposal message in a professional freelance tone.
+
+**Validation:** A Code node checks the generated text before it's written anywhere — rejecting empty/too-short output and any bracket-style placeholder text (e.g. `[Client Name]`), so nothing unfinished ever reaches the sheet.
+
+**Write-back:** The validated proposal is written into the same row via Append or Update Row, matched on the JobTitle column — so re-running the workflow updates the existing row instead of creating a duplicate.
 
 ---
 
 ## Key Features
 
-- AI Proposal Generation
-- Project Requirement Analysis
-- Professional Proposal Writing
-- Dynamic Content Creation
-- Google Docs Integration
-- PDF Export (Optional)
-- Email Delivery
-- Structured JSON Output
-- Error Handling
-- Production Ready Workflow
-
----
-
-## Workflow
-
-1. Receive client request.
-2. Validate project information.
-3. Analyze requirements.
-4. Generate proposal using OpenAI.
-5. Format proposal.
-6. Export document.
-7. Deliver proposal.
-8. Return workflow status.
+- Automatic proposal drafting from structured lead data
+- Row-added trigger (avoids re-trigger loops on self-updates)
+- Placeholder-rejection validation layer before write-back
+- Row matching to prevent duplicate entries
+- Single source of truth (one sheet holds leads + generated proposals)
 
 ---
 
 ## Technology Stack
 
 - n8n
-- OpenAI API
-- Google Docs API
-- Gmail API
-- REST API
-- JSON
+- Google Sheets (Trigger + Read/Write)
+- OpenAI API (gpt-5-mini)
+- LangChain LLM Chain node
+- JavaScript (Code node validation)
 
 ---
 
-## Workflow Architecture
+## Example Input (New Sheet Row)
 
-Client Request
-
-↓
-
-Data Validation
-
-↓
-
-OpenAI Processing
-
-↓
-
-Proposal Generation
-
-↓
-
-Document Formatting
-
-↓
-
-Google Docs / PDF
-
-↓
-
-Email Delivery
+| JobTitle | JobDescription | ClientNeeds | SuggestedPrice | DeliveryTime |
+|---|---|---|---|---|
+| Build an n8n workflow | Need an automation that reads leads from Google Sheets and sends Telegram notifications | Basic error handling, configurable trigger, deduplication | $350 | 3 business days |
 
 ---
 
-## Example Input
+## Example Output (Written Back to Same Row)
 
-```json
-{
-  "clientName": "Acme Inc.",
-  "project": "CRM Automation",
-  "budget": "$5000",
-  "deadline": "2 Weeks"
-}
-```
+> Hello — I can build a reliable n8n workflow that reads leads from your Google Sheets and sends Telegram notifications for new entries. My approach: 1) Configure a Google Sheets trigger to poll or push new rows, 2) Add basic error handling and logging, 3) Add deduplication logic to avoid duplicate alerts, 4) Send formatted Telegram notifications. I can deliver this within 3 business days for $350. Do you have a preference for polling vs. a push-based trigger for detecting new leads?
 
 ---
 
-## Example Output
+## Reliability
 
-```json
-{
-  "status": "Success",
-  "proposalTitle": "CRM Automation Proposal",
-  "estimatedCost": "$5000",
-  "estimatedDuration": "2 Weeks",
-  "documentGenerated": true
-}
-```
+- **Placeholder prevention:** the Validate Proposal node rejects any output containing bracketed placeholder text before it's ever written to the sheet.
+- **No duplicate rows:** Append/Update matches on JobTitle, so reruns update the existing lead instead of creating a new one.
+- **No infinite loop:** trigger is set to Row Added (not Any Update), so the workflow's own write-back doesn't re-fire itself.
 
 ---
 
 ## Business Value
 
-Businesses can:
-
-- Generate proposals in minutes
-- Maintain consistent proposal quality
-- Respond to clients faster
-- Reduce repetitive work
-- Increase sales efficiency
-- Improve proposal turnaround time
-
----
-
-## Screenshots
-
-- n8n Workflow
-- Generated Proposal
-- Google Docs Output
-- Workflow Execution
+- Cuts first-draft proposal time from minutes to seconds per lead
+- Keeps tone and structure consistent across every response
+- Centralizes lead + proposal tracking in a single sheet
+- Frees up time to focus on qualified leads instead of repetitive writing
 
 ---
 
 ## Future Improvements
 
-- Company Branding Templates
-- Electronic Signature Integration
-- CRM Integration
-- Proposal Version History
-- Multi-Language Support
-- Proposal Analytics Dashboard
+- Email delivery of the generated proposal (Gmail integration)
+- PDF/Google Docs export for formal proposal documents
+- Slack/Telegram notification when a new proposal is ready for review
+- Multi-language proposal generation
 
 ---
 

@@ -1,0 +1,270 @@
+{
+  "name": "AI Proposal Generator",
+  "nodes": [
+    {
+      "parameters": {
+        "pollTimes": {
+          "item": [
+            {
+              "mode": "everyMinute"
+            }
+          ]
+        },
+        "documentId": {
+          "__rl": true,
+          "value": "1B2ANRRPdTfxYqkapN53l8k6pQV5k3udRi4ZdluLsm7U",
+          "mode": "list",
+          "cachedResultName": "AI Proposal Generator",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1B2ANRRPdTfxYqkapN53l8k6pQV5k3udRi4ZdluLsm7U/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1B2ANRRPdTfxYqkapN53l8k6pQV5k3udRi4ZdluLsm7U/edit#gid=0"
+        },
+        "event": "rowAdded",
+        "options": {}
+      },
+      "id": "d746c42e-1e73-4040-9e12-b7ead182b267",
+      "name": "Google Sheets Trigger",
+      "type": "n8n-nodes-base.googleSheetsTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ],
+      "credentials": {
+        "googleSheetsTriggerOAuth2Api": {
+          "id": "eBIOwcUtya9Lx2cz",
+          "name": "Google Sheets Trigger account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "=Generate a short, professional freelance proposal message based on the following job details:\n\nJob Title: {{ $json.JobTitle }}\nJob Description: {{ $json.JobDescription }}\nClient Needs: {{ $json.ClientNeeds }}\nSuggested Price: {{ $json.SuggestedPrice }}\nDelivery Time: {{ $json.DeliveryTime }}\n\nWrite it as a first-person message from a freelance n8n automation specialist. Friendly but professional tone, 3-5 sentences. Mention the price and delivery time, and end with one clarifying question about the client's requirements. Do not use placeholder brackets like [Client Name] or [Your Name] anywhere - the message must be ready to send exactly as written."
+      },
+      "id": "a40b7e60-d785-4d7e-bc74-4803e92c7cba",
+      "name": "Basic LLM Chain",
+      "type": "@n8n/n8n-nodes-langchain.chainLlm",
+      "typeVersion": 1.5,
+      "position": [
+        208,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "options": {
+          "maxTokens": 1500
+        }
+      },
+      "id": "4277660e-016c-491e-bd84-9cc5c0b9c33c",
+      "name": "OpenAI Chat Model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1,
+      "position": [
+        208,
+        192
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "DSegp8HQfqiTjs7N",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const text = ($json.text || $json.output || '').trim();\n\nif (!text || text.length < 20) {\n  throw new Error('LLM returned empty or too short proposal text. Check the OpenAI Chat Model node output.');\n}\n\nif (/\\[[^\\]]+\\]/.test(text)) {\n  throw new Error('LLM output contains placeholder bracket text and was rejected: ' + text);\n}\n\nconst source = $('Google Sheets Trigger').item.json;\n\nreturn {\n  json: {\n    JobTitle: source.JobTitle,\n    JobDescription: source.JobDescription,\n    ClientNeeds: source.ClientNeeds,\n    SuggestedPrice: source.SuggestedPrice,\n    DeliveryTime: source.DeliveryTime,\n    Proposal: text\n  }\n};"
+      },
+      "id": "b58a7d63-602a-41a4-ae80-d8342b2df893",
+      "name": "Validate Proposal",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "appendOrUpdate",
+        "documentId": {
+          "__rl": true,
+          "value": "1B2ANRRPdTfxYqkapN53l8k6pQV5k3udRi4ZdluLsm7U",
+          "mode": "list",
+          "cachedResultName": "AI Proposal Generator",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1B2ANRRPdTfxYqkapN53l8k6pQV5k3udRi4ZdluLsm7U/edit?usp=drivesdk"
+        },
+        "sheetName": {
+          "__rl": true,
+          "value": "gid=0",
+          "mode": "list",
+          "cachedResultName": "Sheet1",
+          "cachedResultUrl": "https://docs.google.com/spreadsheets/d/1B2ANRRPdTfxYqkapN53l8k6pQV5k3udRi4ZdluLsm7U/edit#gid=0"
+        },
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "JobTitle": "={{ $json.JobTitle }}",
+            "JobDescription": "={{ $json.JobDescription }}",
+            "ClientNeeds": "={{ $json.ClientNeeds }}",
+            "SuggestedPrice": "={{ $json.SuggestedPrice }}",
+            "DeliveryTime": "={{ $json.DeliveryTime }}",
+            "Proposal": "={{ $json.Proposal }}"
+          },
+          "matchingColumns": [
+            "JobTitle"
+          ],
+          "schema": [
+            {
+              "id": "JobTitle",
+              "displayName": "JobTitle",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true,
+              "removed": false
+            },
+            {
+              "id": "JobDescription",
+              "displayName": "JobDescription",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "ClientNeeds",
+              "displayName": "ClientNeeds",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "SuggestedPrice",
+              "displayName": "SuggestedPrice",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "DeliveryTime",
+              "displayName": "DeliveryTime",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Proposal",
+              "displayName": "Proposal",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            },
+            {
+              "id": "Status",
+              "displayName": "Status",
+              "required": false,
+              "defaultMatch": false,
+              "display": true,
+              "type": "string",
+              "canBeUsedToMatch": true
+            }
+          ],
+          "attemptToConvertTypes": false,
+          "convertFieldsToString": false
+        },
+        "options": {}
+      },
+      "id": "ed4b09e6-051e-4423-978f-bc1a19d2b383",
+      "name": "Append or update row in sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [
+        720,
+        0
+      ],
+      "credentials": {
+        "googleSheetsOAuth2Api": {
+          "id": "M2jZaqhEpdoc4vX2",
+          "name": "Google Sheets account"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Google Sheets Trigger": {
+      "main": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Basic LLM Chain": {
+      "main": [
+        [
+          {
+            "node": "Validate Proposal",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OpenAI Chat Model": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Basic LLM Chain",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Validate Proposal": {
+      "main": [
+        [
+          {
+            "node": "Append or update row in sheet",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate"
+  },
+  "versionId": "0b242f86-c73c-49a2-aaf2-db8ec88c7fff",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "89fc1bab796fd2ac53cde955957fa2923d83ae846ca4d462eaed30a7b1d77f82"
+  },
+  "nodeGroups": [],
+  "id": "3LfWijCGB3X1AXMC",
+  "tags": []
+}
