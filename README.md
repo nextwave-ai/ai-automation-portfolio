@@ -90,6 +90,14 @@ A retrieval-augmented generation (RAG) agent that answers business questions gro
 Ingestion: Webhook → Chunk Text → Generate Embedding → Append to Google Sheet
 Query: Webhook → Embed Question → Semantic Search (cosine similarity) → Confidence Check → [Generate Answer → Intent Router → Book Meeting or Respond] / [Notify Human via Slack]
 
+## 10. AI WhatsApp Sales & Support Agent
+
+Projects/AI-WhatsApp-Business-Agent/ — ⚙️ Runnable Workflow
+
+An AI agent that receives real WhatsApp messages via the Meta Cloud API, classifies each one as a sales or support inquiry, and replies directly on WhatsApp. Support questions are routed to the AI RAG Knowledge Base project's own webhook rather than duplicating a second knowledge base, so one set of company documents serves both a direct API channel and WhatsApp. Every inbound and outbound message is logged to Google Sheets. The sales path is confirmed working end-to-end with a real message delivered back to a live phone; the support path is implemented and integrated but requires the RAG project's query workflow to be running alongside this one.
+
+Meta WhatsApp Cloud API → Webhook (verify + receive) → Extract Message → Log Inbound → Classify Intent (AI) → [support: Query Knowledge Base (RAG project webhook)] / [sales: Generate Sales Reply (AI)] → Send WhatsApp Reply (Graph API) → Log Outbound
+
 ---
 
 # Technology Stack
@@ -100,7 +108,7 @@ Artificial Intelligence: OpenAI API (gpt-4.1-mini, gpt-4o-mini, text-embedding-3
 
 Google Workspace: Gmail, Google Calendar, Google Sheets
 
-Communication: Slack, Telegram
+Communication: Slack, Telegram, WhatsApp Business Cloud API (Meta)
 
 APIs & Data: REST APIs, Webhooks, JSON, HTTP Request
 
@@ -116,7 +124,8 @@ Development: JavaScript (Code nodes), conditional routing, deterministic validat
 - AI decision systems with deterministic validation layers
 - Webhook and Google Sheets-triggered architectures
 - Retrieval-augmented generation (RAG) and semantic search
-- API integration (OpenAI, Google Workspace, Slack, Telegram)
+- Multichannel conversational AI (WhatsApp Business Cloud API integration)
+- API integration (OpenAI, Google Workspace, Slack, Telegram, Meta WhatsApp)
 - Conditional workflow routing and error handling
 - Data validation and normalization
 - Structured AI output design (allow-lists, safe defaults, placeholder rejection)
@@ -127,13 +136,13 @@ Development: JavaScript (Code nodes), conditional routing, deterministic validat
 
 # Business Use Cases
 
-These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management, lead generation, customer support, sales operations, client onboarding, internal knowledge management, and internal operations automation.
+These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management, lead generation, customer support, sales operations, client onboarding, internal knowledge management, WhatsApp-based customer engagement, and internal operations automation.
 
 ---
 
 # Repository Structure
 
-Projects/ contains: AI-Appointment-Scheduling-Assistant, AI-Appointment-Setter-Sheet, AI-CRM-Automation, AI-CRM-Data-Enrichment, AI-Customer-Support-Ticket-Classifier, AI-Lead-Classifier, AI-Proposal-Generator, AI-RAG-Knowledge-Base-Agent, Enterprise-AI-Sales-Agent — plus README.md and LICENSE at the repository root.
+Projects/ contains: AI-Appointment-Scheduling-Assistant, AI-Appointment-Setter-Sheet, AI-CRM-Automation, AI-CRM-Data-Enrichment, AI-Customer-Support-Ticket-Classifier, AI-Lead-Classifier, AI-Proposal-Generator, AI-RAG-Knowledge-Base-Agent, AI-WhatsApp-Business-Agent, Enterprise-AI-Sales-Agent — plus README.md and LICENSE at the repository root.
 
 Each project folder contains a README.md (business problem, architecture, setup, limitations), a workflow.json where available, and screenshots as supporting evidence.
 
@@ -149,7 +158,7 @@ Each project folder contains a README.md (business problem, architecture, setup,
 
 4. Business-Focused Automation — each workflow solves a recognizable operational problem, not just a technical demonstration.
 
-5. Honest Status Reporting — a project is only called "runnable" if an importable, tested workflow.json is included. Screenshots alone are labeled as a documented concept, not a working deliverable.
+5. Honest Status Reporting — a project is only called "runnable" if an importable, tested workflow.json is included. Screenshots alone are labeled as a documented concept, not a working deliverable. Where only part of a workflow's paths are fully confirmed end-to-end, that distinction is stated explicitly in the project's own README rather than implied.
 
 6. Modular Architecture: Input → Validation → Processing → AI Analysis → Decision → Action → Logging → Response
 
@@ -159,15 +168,15 @@ Each project folder contains a README.md (business problem, architecture, setup,
 
 1. Download the workflow.json for the project you want (where available — see status badges above).
 2. Import it into n8n.
-3. Configure your own credentials (OpenAI, Google Workspace, Slack, Telegram as needed).
-4. Update environment-specific IDs — spreadsheet IDs, calendar IDs, Slack channels, webhook paths.
+3. Configure your own credentials (OpenAI, Google Workspace, Slack, Telegram, Meta WhatsApp as needed).
+4. Update environment-specific IDs — spreadsheet IDs, calendar IDs, Slack channels, phone number IDs, webhook paths.
 5. Test every workflow branch before relying on it.
 
 ---
 
 # Security
 
-Credentials and secrets are intentionally not included in this repository. Never commit API keys, OAuth client secrets, access tokens, refresh tokens, Slack/Telegram tokens, .env files, or passwords. All integrations must be configured using your own credentials and environment. Exported workflow files should always be reviewed for sensitive or environment-specific information before being published publicly.
+Credentials and secrets are intentionally not included in this repository. Never commit API keys, OAuth client secrets, access tokens, refresh tokens, Slack/Telegram/Meta tokens, .env files, or passwords. All integrations must be configured using your own credentials and environment. Exported workflow files should always be reviewed for sensitive or environment-specific information before being published publicly.
 
 ---
 
@@ -185,7 +194,7 @@ Future projects will prioritize technical capabilities not yet represented in th
 
 - External REST API integrations with authentication, pagination, and retry logic
 - AI agents with tool calling and multi-step reasoning
-- Voice AI and multichannel (WhatsApp) conversational agents
+- Voice AI conversational agents
 - Human-in-the-loop approval workflows
 - Sub-workflows and reusable components
 
@@ -205,7 +214,7 @@ Open to freelance and project opportunities involving AI automation, n8n develop
 
 # Built With
 
-n8n · OpenAI · Google Workspace · Slack · Telegram · REST APIs · Webhooks · JavaScript · JSON
+n8n · OpenAI · Google Workspace · Slack · Telegram · Meta WhatsApp Business Cloud API · REST APIs · Webhooks · JavaScript · JSON
 
 ---
 
