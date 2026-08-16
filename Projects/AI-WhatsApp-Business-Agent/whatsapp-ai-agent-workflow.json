@@ -1,0 +1,347 @@
+{
+  "name": "WhatsApp - AI Sales & Support Agent",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "GET",
+        "path": "whatsapp-webhook",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-verify-get",
+      "name": "Webhook - Verify (GET)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 160],
+      "webhookId": "whatsapp-webhook-verify"
+    },
+    {
+      "parameters": {
+        "jsCode": "const VERIFY_TOKEN = 'nextwave-verify-2026';\n\nconst query = $input.first().json.query || {};\nconst mode = query['hub.mode'];\nconst token = query['hub.verify_token'];\nconst challenge = query['hub.challenge'];\n\nconst isValid = mode === 'subscribe' && token === VERIFY_TOKEN;\n\nreturn [{ json: { isValid, challenge: challenge || '' } }];"
+      },
+      "id": "code-verify-challenge",
+      "name": "Verify Challenge",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 160]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {"id":"c1","leftValue":"={{ $json.isValid }}","rightValue":true,"operator":{"type":"boolean","operation":"equals"}}
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-verification-valid",
+      "name": "Verification Valid?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 160]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.challenge }}",
+        "options": {"responseCode": 200}
+      },
+      "id": "respond-verify-success",
+      "name": "Respond - Challenge Accepted",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 80]
+    },
+    {
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "Forbidden - token mismatch",
+        "options": {"responseCode": 403}
+      },
+      "id": "respond-verify-fail",
+      "name": "Respond - Forbidden",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [880, 240]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "responseMode": "onReceived",
+        "options": {}
+      },
+      "id": "webhook-incoming-post",
+      "name": "Webhook - Incoming Message (POST)",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [220, 460],
+      "webhookId": "whatsapp-webhook-incoming"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || {};\n\ntry {\n  const entry = body.entry && body.entry[0];\n  const change = entry && entry.changes && entry.changes[0];\n  const value = change && change.value;\n  const message = value && value.messages && value.messages[0];\n\n  if (!message) {\n    return [{ json: { hasMessage: false, raw: body } }];\n  }\n\n  const from = message.from;\n  const messageId = message.id;\n  const timestamp = message.timestamp;\n  const type = message.type;\n  const text = type === 'text' ? message.text.body : `[unsupported message type: ${type}]`;\n  const contactName = (value.contacts && value.contacts[0] && value.contacts[0].profile && value.contacts[0].profile.name) || 'Unknown';\n  const phoneNumberId = value.metadata && value.metadata.phone_number_id;\n\n  return [{ json: {\n    hasMessage: true,\n    from,\n    contactName,\n    messageId,\n    timestamp,\n    type,\n    text,\n    phoneNumberId\n  } }];\n} catch (e) {\n  return [{ json: { hasMessage: false, error: e.message, raw: body } }];\n}"
+      },
+      "id": "code-extract-message",
+      "name": "Extract Message",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [440, 460]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {"id":"c1","leftValue":"={{ $json.hasMessage }}","rightValue":true,"operator":{"type":"boolean","operation":"equals"}}
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-has-message",
+      "name": "Has User Message?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [660, 460]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id":"1","name":"timestamp","type":"string","value":"={{ $now.toISO() }}"},
+            {"id":"2","name":"from","type":"string","value":"={{ $json.from }}"},
+            {"id":"3","name":"contact_name","type":"string","value":"={{ $json.contactName }}"},
+            {"id":"4","name":"message_text","type":"string","value":"={{ $json.text }}"},
+            {"id":"5","name":"message_id","type":"string","value":"={{ $json.messageId }}"},
+            {"id":"6","name":"direction","type":"string","value":"inbound"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-log-row-in",
+      "name": "Prepare Inbound Log Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [880, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "YOUR_SHEET_ID", "mode": "id"},
+        "sheetName": {"__rl": true, "value": "WhatsAppConversations", "mode": "name"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "from": "={{ $json.from }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "message_text": "={{ $json.message_text }}",
+            "message_id": "={{ $json.message_id }}",
+            "direction": "={{ $json.direction }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log-inbound",
+      "name": "Log Inbound Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1100, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", messages: [ { role: \"system\", content: \"Classify the user's WhatsApp message into exactly one intent: sales (pricing, buying, demos, general interest in the product/service) or support (questions about existing policies, how something works, troubleshooting, account issues). Respond ONLY with valid JSON, no markdown, no code fences: {\\\"intent\\\": \\\"sales or support\\\"}\" }, { role: \"user\", content: $('Extract Message').item.json.text } ], temperature: 0 }) }}",
+        "options": {}
+      },
+      "id": "http-classify-intent",
+      "name": "Classify Intent",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1320, 400]
+    },
+    {
+      "parameters": {
+        "jsCode": "let raw = $json.choices[0].message.content;\nraw = raw.replace(/```json|```/g, '').trim();\nlet parsed;\ntry {\n  parsed = JSON.parse(raw);\n} catch (e) {\n  parsed = { intent: 'support' };\n}\nif (!['sales', 'support'].includes(parsed.intent)) {\n  parsed.intent = 'support';\n}\nreturn [{ json: { intent: parsed.intent } }];"
+      },
+      "id": "code-parse-intent",
+      "name": "Parse Intent",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1540, 400]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {"caseSensitive": true, "leftValue": "", "typeValidation": "strict"},
+          "conditions": [
+            {"id":"c1","leftValue":"={{ $json.intent }}","rightValue":"support","operator":{"type":"string","operation":"equals"}}
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "if-intent-router",
+      "name": "Intent Router",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [1760, 400]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "http://localhost:5678/webhook/rag-query",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ question: $('Extract Message').item.json.text }) }}",
+        "options": {}
+      },
+      "id": "http-query-knowledge-base",
+      "name": "Query Knowledge Base",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 280]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { reply_text: $json.answer || \"Thanks for reaching out - a team member will follow up shortly.\" } }];"
+      },
+      "id": "code-extract-rag-answer",
+      "name": "Extract Support Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 280]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/chat/completions",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"gpt-4o-mini\", messages: [ { role: \"system\", content: \"You are a friendly sales assistant for NextWave AI, an AI automation agency. The user has shown sales interest via WhatsApp. Reply in 2-3 short sentences, be warm and conversational (this is WhatsApp, not email), and invite them to share more about their business need or offer to book a short call. Do not use markdown formatting.\" }, { role: \"user\", content: $('Extract Message').item.json.text } ], temperature: 0.5 }) }}",
+        "options": {}
+      },
+      "id": "http-generate-sales-reply",
+      "name": "Generate Sales Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1980, 520]
+    },
+    {
+      "parameters": {
+        "jsCode": "return [{ json: { reply_text: $json.choices[0].message.content } }];"
+      },
+      "id": "code-extract-sales-answer",
+      "name": "Extract Sales Reply",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2200, 520]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ 'https://graph.facebook.com/v21.0/' + $('Extract Message').item.json.phoneNumberId + '/messages' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ messaging_product: \"whatsapp\", to: $('Extract Message').item.json.from, type: \"text\", text: { body: $json.reply_text } }) }}",
+        "options": {}
+      },
+      "id": "http-send-whatsapp-reply",
+      "name": "Send WhatsApp Reply",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2420, 400]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id":"1","name":"timestamp","type":"string","value":"={{ $now.toISO() }}"},
+            {"id":"2","name":"from","type":"string","value":"={{ $('Extract Message').item.json.from }}"},
+            {"id":"3","name":"contact_name","type":"string","value":"={{ $('Extract Message').item.json.contactName }}"},
+            {"id":"4","name":"message_text","type":"string","value":"={{ $('Send WhatsApp Reply').item.json.reply_text || '' }}"},
+            {"id":"5","name":"message_id","type":"string","value":"={{ $('Extract Message').item.json.messageId + '-reply' }}"},
+            {"id":"6","name":"direction","type":"string","value":"outbound"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-log-row-out",
+      "name": "Prepare Outbound Log Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [2640, 400]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "YOUR_SHEET_ID", "mode": "id"},
+        "sheetName": {"__rl": true, "value": "WhatsAppConversations", "mode": "name"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "timestamp": "={{ $json.timestamp }}",
+            "from": "={{ $json.from }}",
+            "contact_name": "={{ $json.contact_name }}",
+            "message_text": "={{ $json.message_text }}",
+            "message_id": "={{ $json.message_id }}",
+            "direction": "={{ $json.direction }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-log-outbound",
+      "name": "Log Outbound Message",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [2860, 400]
+    }
+  ],
+  "connections": {
+    "Webhook - Verify (GET)": {"main": [[{"node": "Verify Challenge", "type": "main", "index": 0}]]},
+    "Verify Challenge": {"main": [[{"node": "Verification Valid?", "type": "main", "index": 0}]]},
+    "Verification Valid?": {
+      "main": [
+        [{"node": "Respond - Challenge Accepted", "type": "main", "index": 0}],
+        [{"node": "Respond - Forbidden", "type": "main", "index": 0}]
+      ]
+    },
+    "Webhook - Incoming Message (POST)": {"main": [[{"node": "Extract Message", "type": "main", "index": 0}]]},
+    "Extract Message": {"main": [[{"node": "Has User Message?", "type": "main", "index": 0}]]},
+    "Has User Message?": {
+      "main": [
+        [{"node": "Prepare Inbound Log Row", "type": "main", "index": 0}]
+      ]
+    },
+    "Prepare Inbound Log Row": {"main": [[{"node": "Log Inbound Message", "type": "main", "index": 0}]]},
+    "Log Inbound Message": {"main": [[{"node": "Classify Intent", "type": "main", "index": 0}]]},
+    "Classify Intent": {"main": [[{"node": "Parse Intent", "type": "main", "index": 0}]]},
+    "Parse Intent": {"main": [[{"node": "Intent Router", "type": "main", "index": 0}]]},
+    "Intent Router": {
+      "main": [
+        [{"node": "Query Knowledge Base", "type": "main", "index": 0}],
+        [{"node": "Generate Sales Reply", "type": "main", "index": 0}]
+      ]
+    },
+    "Query Knowledge Base": {"main": [[{"node": "Extract Support Reply", "type": "main", "index": 0}]]},
+    "Extract Support Reply": {"main": [[{"node": "Send WhatsApp Reply", "type": "main", "index": 0}]]},
+    "Generate Sales Reply": {"main": [[{"node": "Extract Sales Reply", "type": "main", "index": 0}]]},
+    "Extract Sales Reply": {"main": [[{"node": "Send WhatsApp Reply", "type": "main", "index": 0}]]},
+    "Send WhatsApp Reply": {"main": [[{"node": "Prepare Outbound Log Row", "type": "main", "index": 0}]]},
+    "Prepare Outbound Log Row": {"main": [[{"node": "Log Outbound Message", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"}
+}
