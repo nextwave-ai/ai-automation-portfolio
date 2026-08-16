@@ -1,0 +1,111 @@
+{
+  "name": "RAG - Document Ingestion",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "rag-ingest",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-ingest",
+      "name": "Webhook - Ingest Document",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [240, 300],
+      "webhookId": "rag-ingest-webhook"
+    },
+    {
+      "parameters": {
+        "jsCode": "const body = $input.first().json.body || $input.first().json;\nconst text = body.text || '';\nconst source = body.source || 'unknown';\nconst docId = body.doc_id || Date.now().toString();\nconst chunkSize = 800;\nconst overlap = 100;\nconst chunks = [];\nlet start = 0;\nlet index = 0;\nwhile (start < text.length) {\n  const end = Math.min(start + chunkSize, text.length);\n  const chunkText = text.slice(start, end).trim();\n  if (chunkText.length > 0) {\n    chunks.push({ json: { chunk_text: chunkText, chunk_index: index, source, doc_id: docId } });\n    index++;\n  }\n  start += chunkSize - overlap;\n}\nreturn chunks;"
+      },
+      "id": "code-chunk",
+      "name": "Chunk Text",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [460, 300]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.openai.com/v1/embeddings",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "openAiApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ model: \"text-embedding-3-small\", input: $json.chunk_text }) }}",
+        "options": {}
+      },
+      "id": "http-embed-ingest",
+      "name": "Generate Embedding",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [680, 300]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {"id":"1","name":"chunk_text","type":"string","value":"={{ $('Chunk Text').item.json.chunk_text }}"},
+            {"id":"2","name":"source","type":"string","value":"={{ $('Chunk Text').item.json.source }}"},
+            {"id":"3","name":"doc_id","type":"string","value":"={{ $('Chunk Text').item.json.doc_id }}"},
+            {"id":"4","name":"chunk_index","type":"number","value":"={{ $('Chunk Text').item.json.chunk_index }}"},
+            {"id":"5","name":"embedding","type":"string","value":"={{ JSON.stringify($json.data[0].embedding) }}"},
+            {"id":"6","name":"created_at","type":"string","value":"={{ $now.toISO() }}"}
+          ]
+        },
+        "options": {}
+      },
+      "id": "set-prepare-row",
+      "name": "Prepare Row",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [900, 300]
+    },
+    {
+      "parameters": {
+        "operation": "append",
+        "documentId": {"__rl": true, "value": "YOUR_SHEET_ID", "mode": "id"},
+        "sheetName": {"__rl": true, "value": "KnowledgeBase", "mode": "name"},
+        "columns": {
+          "mappingMode": "defineBelow",
+          "value": {
+            "chunk_text": "={{ $json.chunk_text }}",
+            "source": "={{ $json.source }}",
+            "doc_id": "={{ $json.doc_id }}",
+            "chunk_index": "={{ $json.chunk_index }}",
+            "embedding": "={{ $json.embedding }}",
+            "created_at": "={{ $json.created_at }}"
+          }
+        },
+        "options": {}
+      },
+      "id": "sheets-append",
+      "name": "Append Chunk to Sheet",
+      "type": "n8n-nodes-base.googleSheets",
+      "typeVersion": 4.5,
+      "position": [1120, 300]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ { \"status\": \"success\", \"doc_id\": $('Chunk Text').first().json.doc_id, \"chunks_stored\": $items().length } }}",
+        "options": {}
+      },
+      "id": "respond-ingest",
+      "name": "Respond Success",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [1340, 300]
+    }
+  ],
+  "connections": {
+    "Webhook - Ingest Document": {"main": [[{"node": "Chunk Text", "type": "main", "index": 0}]]},
+    "Chunk Text": {"main": [[{"node": "Generate Embedding", "type": "main", "index": 0}]]},
+    "Generate Embedding": {"main": [[{"node": "Prepare Row", "type": "main", "index": 0}]]},
+    "Prepare Row": {"main": [[{"node": "Append Chunk to Sheet", "type": "main", "index": 0}]]},
+    "Append Chunk to Sheet": {"main": [[{"node": "Respond Success", "type": "main", "index": 0}]]}
+  },
+  "active": false,
+  "settings": {"executionOrder": "v1"}
+}
