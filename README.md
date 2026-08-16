@@ -81,13 +81,22 @@ Projects/AI-Proposal-Generator/ — 📄 Documented Concept
 
 Generates a structured client proposal (scope, pricing, timeline) from project requirements using OpenAI. Built and executed in n8n (see included screenshots); an importable workflow.json is not yet included in this repository.
 
+## 9. AI RAG Knowledge Base & Business Agent
+
+Projects/AI-RAG-Knowledge-Base-Agent/ — ⚙️ Runnable Workflow
+
+A retrieval-augmented generation (RAG) agent that answers business questions grounded in company documents, and takes real action when the user's intent requires it. Two independent workflows: a document ingestion pipeline that chunks and embeds text into a Google Sheets-based vector store, and a query agent that retrieves relevant context via cosine similarity, answers questions with source attribution, books meetings in Google Calendar when asked, and escalates low-confidence questions to Slack instead of letting the model guess.
+
+Ingestion: Webhook → Chunk Text → Generate Embedding → Append to Google Sheet
+Query: Webhook → Embed Question → Semantic Search (cosine similarity) → Confidence Check → [Generate Answer → Intent Router → Book Meeting or Respond] / [Notify Human via Slack]
+
 ---
 
 # Technology Stack
 
 Workflow Automation: n8n
 
-Artificial Intelligence: OpenAI API (gpt-4.1-mini), LangChain nodes (LLM Chain, Chat Model, Output Parser), structured/validated AI outputs, prompt engineering
+Artificial Intelligence: OpenAI API (gpt-4.1-mini, gpt-4o-mini, text-embedding-3-small), LangChain nodes (LLM Chain, Chat Model, Output Parser), structured/validated AI outputs, prompt engineering, retrieval-augmented generation (RAG)
 
 Google Workspace: Gmail, Google Calendar, Google Sheets
 
@@ -106,6 +115,7 @@ Development: JavaScript (Code nodes), conditional routing, deterministic validat
 - Lead qualification and enrichment
 - AI decision systems with deterministic validation layers
 - Webhook and Google Sheets-triggered architectures
+- Retrieval-augmented generation (RAG) and semantic search
 - API integration (OpenAI, Google Workspace, Slack, Telegram)
 - Conditional workflow routing and error handling
 - Data validation and normalization
@@ -117,13 +127,13 @@ Development: JavaScript (Code nodes), conditional routing, deterministic validat
 
 # Business Use Cases
 
-These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management, lead generation, customer support, sales operations, client onboarding, and internal operations automation.
+These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management, lead generation, customer support, sales operations, client onboarding, internal knowledge management, and internal operations automation.
 
 ---
 
 # Repository Structure
 
-Projects/ contains: AI-Appointment-Scheduling-Assistant, AI-Appointment-Setter-Sheet, AI-CRM-Automation, AI-CRM-Data-Enrichment, AI-Customer-Support-Ticket-Classifier, AI-Lead-Classifier, AI-Proposal-Generator, Enterprise-AI-Sales-Agent — plus README.md and LICENSE at the repository root.
+Projects/ contains: AI-Appointment-Scheduling-Assistant, AI-Appointment-Setter-Sheet, AI-CRM-Automation, AI-CRM-Data-Enrichment, AI-Customer-Support-Ticket-Classifier, AI-Lead-Classifier, AI-Proposal-Generator, AI-RAG-Knowledge-Base-Agent, Enterprise-AI-Sales-Agent — plus README.md and LICENSE at the repository root.
 
 Each project folder contains a README.md (business problem, architecture, setup, limitations), a workflow.json where available, and screenshots as supporting evidence.
 
@@ -174,8 +184,8 @@ Portfolio-tested does not mean production-ready. Production deployment would req
 Future projects will prioritize technical capabilities not yet represented in this portfolio, rather than repeating existing patterns:
 
 - External REST API integrations with authentication, pagination, and retry logic
-- Document processing and RAG / vector search systems
 - AI agents with tool calling and multi-step reasoning
+- Voice AI and multichannel (WhatsApp) conversational agents
 - Human-in-the-loop approval workflows
 - Sub-workflows and reusable components
 
