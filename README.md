@@ -16,6 +16,7 @@ Not every project in this portfolio is at the same maturity level, and that's st
 
 - Runnable Workflow (⚙️) — a working workflow.json is included in the project folder, importable directly into n8n, and has been tested end-to-end.
 - Documented Concept (📄) — the workflow was built and executed in n8n (screenshots included as evidence), but an importable workflow.json is not yet included in this repository.
+- Capability Validation (🔬) — built and tested end-to-end against a live third-party platform account (not a simulated demo, not mock data), to confirm a specific integration pattern works before offering it to clients. Hosted as a separate repository. See that project's own README for the platform-specific context.
 
 No project in this repository is labeled "production-ready." See Project Status below for what that distinction actually means.
 
@@ -100,6 +101,20 @@ Meta WhatsApp Cloud API → Webhook (verify + receive) → Extract Message → L
 
 ---
 
+# Capability Validation Projects
+
+These are built and tested differently from the Featured Projects above: end-to-end against a live account on a real third-party platform (not a simulated demo, not mock data), specifically to confirm a particular integration pattern actually works before offering it to clients. Each is hosted as its own separate repository rather than a subfolder of this one.
+
+## 11. AI GHL Lead Qualifier
+
+[github.com/nextwave-ai/AI-GHL-Lead-Qualifier](https://github.com/nextwave-ai/AI-GHL-Lead-Qualifier) — 🔬 Capability Validation
+
+Bridges GoHighLevel (GHL) — a CRM/marketing platform with limited native automation — with custom AI logic via n8n. When a new inquiry comes in through a GHL form, an AI model reads and qualifies it, then the contact is automatically tagged in GHL and, for genuinely qualified leads, sent a personalized AI-drafted follow-up email — without manual review. Built and tested against a live GHL trial account, with both the qualified and unqualified paths confirmed using real form submissions.
+
+GHL Form Submission → GHL Workflow (Webhook Action) → n8n Webhook → AI Qualification (OpenAI) → Parse → [Qualified: Tag Contact + Send Follow-up Email] / [Unqualified: Tag Contact Only]
+
+---
+
 # Technology Stack
 
 Workflow Automation: n8n
@@ -107,6 +122,8 @@ Workflow Automation: n8n
 Artificial Intelligence: OpenAI API (gpt-4.1-mini, gpt-4o-mini, text-embedding-3-small), LangChain nodes (LLM Chain, Chat Model, Output Parser), structured/validated AI outputs, prompt engineering, retrieval-augmented generation (RAG)
 
 Google Workspace: Gmail, Google Calendar, Google Sheets
+
+CRM Platforms: GoHighLevel (GHL) — REST API v2, Private Integrations, Contacts, Conversations
 
 Communication: Slack, Telegram, WhatsApp Business Cloud API (Meta)
 
@@ -125,7 +142,7 @@ Development: JavaScript (Code nodes), conditional routing, deterministic validat
 - Webhook and Google Sheets-triggered architectures
 - Retrieval-augmented generation (RAG) and semantic search
 - Multichannel conversational AI (WhatsApp Business Cloud API integration)
-- API integration (OpenAI, Google Workspace, Slack, Telegram, Meta WhatsApp)
+- API integration (OpenAI, Google Workspace, Slack, Telegram, Meta WhatsApp, GoHighLevel)
 - Conditional workflow routing and error handling
 - Data validation and normalization
 - Structured AI output design (allow-lists, safe defaults, placeholder rejection)
@@ -136,7 +153,7 @@ Development: JavaScript (Code nodes), conditional routing, deterministic validat
 
 # Business Use Cases
 
-These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management, lead generation, customer support, sales operations, client onboarding, internal knowledge management, WhatsApp-based customer engagement, and internal operations automation.
+These architectures can be adapted for B2B sales teams, marketing agencies, SaaS companies, consulting and service businesses, CRM management (including GoHighLevel), lead generation, customer support, sales operations, client onboarding, internal knowledge management, WhatsApp-based customer engagement, and internal operations automation.
 
 ---
 
@@ -145,6 +162,8 @@ These architectures can be adapted for B2B sales teams, marketing agencies, SaaS
 Projects/ contains: AI-Appointment-Scheduling-Assistant, AI-Appointment-Setter-Sheet, AI-CRM-Automation, AI-CRM-Data-Enrichment, AI-Customer-Support-Ticket-Classifier, AI-Lead-Classifier, AI-Proposal-Generator, AI-RAG-Knowledge-Base-Agent, AI-WhatsApp-Business-Agent, Enterprise-AI-Sales-Agent — plus README.md and LICENSE at the repository root.
 
 Each project folder contains a README.md (business problem, architecture, setup, limitations), a workflow.json where available, and screenshots as supporting evidence.
+
+Capability Validation projects (see above) are hosted as separate, standalone repositories rather than subfolders here, since they're built against live third-party accounts rather than portfolio demos — currently: AI-GHL-Lead-Qualifier.
 
 ---
 
@@ -158,7 +177,7 @@ Each project folder contains a README.md (business problem, architecture, setup,
 
 4. Business-Focused Automation — each workflow solves a recognizable operational problem, not just a technical demonstration.
 
-5. Honest Status Reporting — a project is only called "runnable" if an importable, tested workflow.json is included. Screenshots alone are labeled as a documented concept, not a working deliverable. Where only part of a workflow's paths are fully confirmed end-to-end, that distinction is stated explicitly in the project's own README rather than implied.
+5. Honest Status Reporting — a project is only called "runnable" if an importable, tested workflow.json is included. Screenshots alone are labeled as a documented concept, not a working deliverable. Where only part of a workflow's paths are fully confirmed end-to-end, that distinction is stated explicitly in the project's own README rather than implied. Capability Validation projects are labeled as such rather than folded into the main portfolio, since they're built against a personal trial account rather than a delivered client project.
 
 6. Modular Architecture: Input → Validation → Processing → AI Analysis → Decision → Action → Logging → Response
 
@@ -168,7 +187,7 @@ Each project folder contains a README.md (business problem, architecture, setup,
 
 1. Download the workflow.json for the project you want (where available — see status badges above).
 2. Import it into n8n.
-3. Configure your own credentials (OpenAI, Google Workspace, Slack, Telegram, Meta WhatsApp as needed).
+3. Configure your own credentials (OpenAI, Google Workspace, Slack, Telegram, Meta WhatsApp, GoHighLevel as needed).
 4. Update environment-specific IDs — spreadsheet IDs, calendar IDs, Slack channels, phone number IDs, webhook paths.
 5. Test every workflow branch before relying on it.
 
@@ -176,7 +195,7 @@ Each project folder contains a README.md (business problem, architecture, setup,
 
 # Security
 
-Credentials and secrets are intentionally not included in this repository. Never commit API keys, OAuth client secrets, access tokens, refresh tokens, Slack/Telegram/Meta tokens, .env files, or passwords. All integrations must be configured using your own credentials and environment. Exported workflow files should always be reviewed for sensitive or environment-specific information before being published publicly.
+Credentials and secrets are intentionally not included in this repository. Never commit API keys, OAuth client secrets, access tokens, refresh tokens, Slack/Telegram/Meta/GoHighLevel tokens, .env files, or passwords. All integrations must be configured using your own credentials and environment. Exported workflow files should always be reviewed for sensitive or environment-specific information before being published publicly.
 
 ---
 
@@ -214,7 +233,7 @@ Open to freelance and project opportunities involving AI automation, n8n develop
 
 # Built With
 
-n8n · OpenAI · Google Workspace · Slack · Telegram · Meta WhatsApp Business Cloud API · REST APIs · Webhooks · JavaScript · JSON
+n8n · OpenAI · Google Workspace · Slack · Telegram · Meta WhatsApp Business Cloud API · GoHighLevel · REST APIs · Webhooks · JavaScript · JSON
 
 ---
 
