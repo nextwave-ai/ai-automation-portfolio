@@ -1,0 +1,299 @@
+{
+  "name": "GHL Lead Automation - Inquiry Qualifier",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "bb7e780b-ca23-48e6-96b1-c693f892f65f",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2.1,
+      "position": [
+        0,
+        0
+      ],
+      "id": "2f3b11a7-0e33-4280-9a8b-7f6346f8b62b",
+      "name": "Webhook",
+      "webhookId": "bb7e780b-ca23-48e6-96b1-c693f892f65f"
+    },
+    {
+      "parameters": {
+        "modelId": {
+          "__rl": true,
+          "value": "gpt-4o-mini",
+          "mode": "list",
+          "cachedResultName": "GPT-4O-MINI"
+        },
+        "responses": {
+          "values": [
+            {
+              "role": "system",
+              "content": "You are a lead qualification assistant for an AI automation freelance business (NextWave AI). Analyze the inquiry message and respond ONLY with valid JSON in this exact format: {\"qualified\": true or false, \"category\": \"high-value\" or \"low-value\" or \"spam\", \"reason\": \"one short sentence explaining why\", \"suggested_reply\": \"a short, friendly 2-sentence reply to send back to the lead\"}. Mark as qualified=true only if the message describes a real business automation/CRM/workflow need. Mark as spam if it's gibberish, empty, or clearly unrelated."
+            },
+            {
+              "content": "={{ $json.body[\"What do you need help with?\"] }}"
+            }
+          ]
+        },
+        "builtInTools": {},
+        "options": {}
+      },
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.3,
+      "position": [
+        208,
+        0
+      ],
+      "id": "aa91d160-d2c0-43e3-8b01-12e49909b2a1",
+      "name": "Message a model",
+      "credentials": {
+        "openAiApi": {
+          "id": "DSegp8HQfqiTjs7N",
+          "name": "OpenAI account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "c971fc35-f7ce-44f0-bd47-87db5dc8dcba",
+              "name": "parsed",
+              "value": "={{ JSON.parse($json.output[0].content[0].text) }}",
+              "type": "object"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        560,
+        0
+      ],
+      "id": "35ac255a-ca80-44a6-8b31-371622db5e37",
+      "name": "Edit Fields"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "strict",
+            "version": 3
+          },
+          "conditions": [
+            {
+              "id": "1aae0234-ff3c-42fd-8650-474df9fb9a1c",
+              "leftValue": "={{ $json.parsed.qualified }}",
+              "rightValue": "",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.3,
+      "position": [
+        768,
+        0
+      ],
+      "id": "457640c8-5171-413a-931f-a7c38ca7e74d",
+      "name": "If"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $('Webhook').item.json.body.contact_id }}/tags",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"tags\": [\"ai-qualified-high-value\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        976,
+        -96
+      ],
+      "id": "4713ad3e-d8be-4291-b18f-3e80519c1eed",
+      "name": "HTTP Request",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "J010MKjPiGs5NkbB",
+          "name": "GHL Private Integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://services.leadconnectorhq.com/conversations/messages",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={\n  \"type\": \"Email\",\n  \"contactId\": \"{{ $('Webhook').item.json.body.contact_id }}\",\n  \"subject\": \"Thanks for reaching out to NextWave AI\",\n  \"html\": \"{{ $('Edit Fields').item.json.parsed.suggested_reply }}\",\n  \"emailTo\": \"{{ $('Webhook').item.json.body.email }}\"\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        1184,
+        -96
+      ],
+      "id": "6f68e75b-6f8a-413c-9d29-03a7c7d53467",
+      "name": "HTTP Request1",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "J010MKjPiGs5NkbB",
+          "name": "GHL Private Integration"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://services.leadconnectorhq.com/contacts/{{ $('Webhook').item.json.body.contact_id }}/tags",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "Version",
+              "value": "2021-07-28"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "{\n  \"tags\": [\"ai-low-value-or-spam\"]\n}",
+        "options": {}
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.4,
+      "position": [
+        976,
+        96
+      ],
+      "id": "3d2994bf-a3f5-4bf8-a861-a6eb9a2518da",
+      "name": "HTTP Request2",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "J010MKjPiGs5NkbB",
+          "name": "GHL Private Integration"
+        }
+      }
+    }
+  ],
+  "pinData": {},
+  "connections": {
+    "Webhook": {
+      "main": [
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Edit Fields",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Edit Fields": {
+      "main": [
+        [
+          {
+            "node": "If",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "If": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "HTTP Request2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "HTTP Request": {
+      "main": [
+        [
+          {
+            "node": "HTTP Request1",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "active": false,
+  "settings": {
+    "executionOrder": "v1",
+    "binaryMode": "separate",
+    "availableInMCP": false
+  },
+  "versionId": "a6c29766-cc6c-4183-99e7-198e10ac4216",
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "89fc1bab796fd2ac53cde955957fa2923d83ae846ca4d462eaed30a7b1d77f82"
+  },
+  "nodeGroups": [],
+  "id": "LIV75iaKbRga2Ddc",
+  "tags": []
+}
